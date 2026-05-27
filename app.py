@@ -1,199 +1,254 @@
-import streamlit as st
-import pandas as pd
-from datetime import datetime
-import json
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>La Clementina · Stock Semillas</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500&display=swap');
+:root {
+  --bg: #f4f6f9; --panel: #fff; --card: #fff; --border: #dde1ea;
+  --accent: #e07b00; --blue: #1a7abf; --green: #2e8b57; --red: #c0392b;
+  --purple: #7b4fa6; --text: #1a1e2e; --muted: #6b7280; --shadow: 0 1px 4px rgba(0,0,0,.08);
+  --fh: 'Barlow Condensed', sans-serif;
+  --fb: 'Barlow', sans-serif;
+}
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--fb);
+  margin: 0;
+  padding: 0;
+}
+.app-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+h1, h2, h3, .brand { font-family: var(--fh); }
+.header {
+  background: var(--panel);
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  margin-bottom: 20px;
+  border-bottom: 4px solid var(--accent);
+}
+.header h1 { margin: 0; font-size: 2rem; text-transform: uppercase; }
+.header h1 span { color: var(--accent); }
 
-# --- CONFIGURACIÓN DE PÁGINA ---
-st.set_page_config(
-    page_title="La Clementina · Stock Semillas",
-    page_icon="🌱",
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
+/* Tabs */
+.tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+.tab {
+  padding: 10px 20px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: var(--fh);
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.tab.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
 
-# --- ESTILOS CSS (Inspirados en tu HTML) ---
-st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500&display=swap');
-    
-    :root {
-        --accent: #e07b00;
-        --blue: #1a7abf;
-        --bg-dark: #1a2a4a;
-    }
+/* Cards & Tables */
+.card {
+  background: var(--card);
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  margin-bottom: 20px;
+}
+table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); }
+th { font-family: var(--fh); text-transform: uppercase; color: var(--muted); }
+.badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+.badge-green { background: #e8f5e9; color: var(--green); }
+.badge-blue { background: #e3f2fd; color: var(--blue); }
 
-    /* Reset y fuentes */
-    .main .block-container { padding-top: 2rem; }
-    html, body, [data-testid="stSidebar"] {
-        font-family: 'Barlow', sans-serif;
-    }
+/* Buttons */
+.btn {
+  padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;
+  font-family: var(--fh); text-transform: uppercase; font-weight: bold;
+  transition: all 0.2s;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-ol { background: transparent; border: 1px solid var(--border); color: var(--text); }
+.gnh { color: var(--green); border-color: var(--green); }
+.rh { color: var(--red); border-color: var(--red); }
+.btn-wa { background: #25D366; color: white; border: none; }
 
-    /* Header Estilo La Clementina */
-    .custom-header {
-        background: linear-gradient(135deg, #1a2a4a 60%, #1e3660);
-        border-bottom: 3px solid var(--accent);
-        padding: 20px;
-        border-radius: 10px;
-        color: white;
-        margin-bottom: 25px;
-    }
-    .custom-header h1 {
-        font-family: 'Barlow Condensed', sans-serif;
-        font-weight: 800;
-        text-transform: uppercase;
-        margin: 0;
-        font-size: 2.2rem;
-    }
-    .custom-header h1 span { color: #f5a623; }
+/* Admin Area */
+.admin-card { border: 1px solid var(--border); padding: 15px; margin-bottom: 15px; border-radius: 8px; }
+.danger-zone { border: 1px solid #f5a5a5; padding: 15px; border-radius: 8px; background: #fffafa; }
 
-    /* KPIs Cards */
-    .kpi-container {
-        display: flex;
-        gap: 10px;
-        margin-bottom: 20px;
-    }
-    .kpi-card {
-        background: white;
-        padding: 15px;
-        border-radius: 8px;
-        border: 1px solid #dde1ea;
-        flex: 1;
-        box-shadow: 0 1px 4px rgba(0,0,0,.08);
-    }
-    .kpi-val {
-        font-family: 'Barlow Condensed', sans-serif;
-        font-size: 2rem;
-        font-weight: 800;
-        line-height: 1;
-        display: block;
-    }
-    .kpi-lbl {
-        font-size: 0.7rem;
-        color: #6b7280;
-        text-transform: uppercase;
-        letter-spacing: 0.7px;
-    }
+/* Footer */
+.footer {
+  text-align: center;
+  padding: 20px;
+  margin-top: 40px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
 
-    /* Botones y Tabs */
-    .stButton>button {
-        background-color: var(--accent);
-        color: white;
-        font-family: 'Barlow Condensed', sans-serif;
-        font-weight: 700;
-        text-transform: uppercase;
-        border: none;
-    }
-    </style>
-""", unsafe_allow_html=True)
+<script type="text/babel">
+const { useState, useEffect } = React;
 
-# --- LÓGICA DE DATOS (Simulación de DB) ---
-if 'db' not in st.session_state:
-    st.session_state.db = {
-        'stock': [
-            {'id': 1, 'campaña': '23/24', 'especie': 'SOJA', 'variedad': 'NIDERA 5009', 'deposito': 'PLANTA 1', 'cantidad': 450, 'unidad': 'Bolsas', 'estado': 'Disponible'},
-            {'id': 2, 'campaña': '23/24', 'especie': 'MAIZ', 'variedad': 'DK 72-10', 'deposito': 'PLANTA 2', 'cantidad': 120, 'unidad': 'Bolsas', 'estado': 'Disponible'}
-        ],
-        'historial': [],
-        'ordenes': []
-    }
+function App() {
+  const [activeTab, setActiveTab] = useState("stock");
+  const [stock, setStock] = useState([
+    { id: 1, campaña: "23/24", especie: "SOJA", variedad: "NIDERA 5009", cantidad: 450 },
+    { id: 2, campaña: "24/25", especie: "MAIZ", variedad: "DK 72-10", cantidad: 120 }
+  ]);
+  const [ordenes, setOrdenes] = useState([]);
+  const [modal, setModal] = useState(null);
 
-# --- HEADER ---
-st.markdown("""
-    <div class="custom-header">
+  // Funciones de admin
+  const handleChangePass = () => {
+    alert("Funcionalidad de cambio de clave (Blindada)");
+  };
+  const resetAll = () => {
+    if(confirm("¿Estás seguro de resetear todos los datos?")) {
+      setStock([]);
+      setOrdenes([]);
+    }
+  };
+
+  // Mensaje de WhatsApp Mejorado
+  const enviarWhatsApp = (oc) => {
+    const texto = `🚜 *LA CLEMENTINA - ÓRDEN DE CARGA* 🚜\n\n` +
+                  `*ID de Órden:* #${oc.id}\n` +
+                  `*Especie:* ${oc.especie} - ${oc.variedad}\n` +
+                  `*Cantidad:* ${oc.cantidad} bolsas\n` +
+                  `*Destino:* ${oc.destino}\n` +
+                  `*Transporte:* ${oc.transporte || 'A confirmar'}\n\n` +
+                  `_Gestionado vía Sistema Autogestión_`;
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
+    window.open(url, '_blank');
+  };
+
+  // Renderizado Condicional de Tabs
+  return (
+    <div className="app-container">
+      <div className="header">
         <h1>LA CLEMENTINA · <span>STOCK SEMILLAS</span></h1>
-        <p style="opacity:0.7">Gestión Profesional de Inventario Agrícola</p>
+        <p style={{ margin: 0, color: "var(--muted)" }}>Gestión Profesional de Inventario Agrícola</p>
+      </div>
+
+      <div className="tabs">
+        <div className={`tab ${activeTab === 'stock' ? 'active' : ''}`} onClick={() => setActiveTab('stock')}>📊 Stock</div>
+        <div className={`tab ${activeTab === 'ordenes' ? 'active' : ''}`} onClick={() => setActiveTab('ordenes')}>📑 Órdenes</div>
+        <div className={`tab ${activeTab === 'admin' ? 'active' : ''}`} onClick={() => setActiveTab('admin')}>⚙️ Configuración</div>
+      </div>
+
+      {/* TAB: STOCK */}
+      {activeTab === "stock" && (
+        <div className="card">
+          <h2>Resumen de Inventario</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Campaña</th>
+                <th>Especie</th>
+                <th>Variedad</th>
+                <th>Stock Disponible</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stock.map(item => (
+                <tr key={item.id}>
+                  <td><span className="badge badge-blue">{item.campaña}</span></td>
+                  <td><strong>{item.especie}</strong></td>
+                  <td>{item.variedad}</td>
+                  <td>{item.cantidad} bolsas</td>
+                  <td>
+                    <button className="btn btn-primary" onClick={() => alert("Mover/Despachar " + item.variedad)}>Mover</button>
+                  </td>
+                </tr>
+              ))}
+              {stock.length === 0 && <tr><td colSpan="5">No hay stock registrado.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* TAB: ÓRDENES */}
+      {activeTab === "ordenes" && (
+        <div className="card">
+          <h2>Órdenes de Carga Generadas</h2>
+          <button className="btn btn-primary" onClick={() => setOrdenes([...ordenes, { id: Date.now(), especie: "SOJA", variedad: "Generica", cantidad: 100, destino: "Puerto", transporte: "Camión A" }])} style={{marginBottom: '15px'}}>
+            + Simular Nueva Órden
+          </button>
+          <table>
+            <thead>
+              <tr>
+                <th>ID Órden</th>
+                <th>Detalle</th>
+                <th>Destino</th>
+                <th>Notificar</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ordenes.map(oc => (
+                <tr key={oc.id}>
+                  <td>#{oc.id.toString().slice(-4)}</td>
+                  <td>{oc.cantidad} bls - {oc.especie}</td>
+                  <td>{oc.destino}</td>
+                  <td>
+                    <button className="btn btn-wa" onClick={() => enviarWhatsApp(oc)}>📱 WhatsApp</button>
+                  </td>
+                </tr>
+              ))}
+              {ordenes.length === 0 && <tr><td colSpan="4">No hay órdenes pendientes.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* TAB: ADMIN */}
+      {activeTab === "admin" && (
+        <div className="card">
+          <h2>Panel de Administración</h2>
+          <div className="admin-card">
+            <h3>Seguridad</h3>
+            <button className="btn btn-ol gnh" onClick={handleChangePass}>✓ Guardar nueva clave</button>
+          </div>
+          <div className="admin-card danger-zone">
+            <h3 style={{color:"var(--red)", marginBottom:8}}>⚠ Zona de peligro</h3>
+            <p style={{fontSize:".8rem", color:"var(--muted)", marginBottom:10}}>Borra todo el stock, historial, órdenes y catálogos, volviendo al estado inicial de demostración.</p>
+            <button className="btn btn-ol rh" onClick={resetAll}>🗑 Resetear todos los datos</button>
+          </div>
+        </div>
+      )}
+
+      <div className="footer">
+        Creado por Ignacio Diaz
+      </div>
     </div>
-""", unsafe_allow_html=True)
+  );
+}
 
-# --- TABS PRINCIPALES ---
-tab_stock, tab_movimientos, tab_ordenes, tab_admin = st.tabs([
-    "📊 RESUMEN STOCK", 
-    "🔄 MOVIMIENTOS", 
-    "📑 ÓRDENES DE CARGA", 
-    "⚙️ CONFIGURACIÓN"
-])
-
-# --- TAB: RESUMEN STOCK ---
-with tab_stock:
-    # KPIs Rápidos
-    total_bolsas = sum(item['cantidad'] for item in st.session_state.db['stock'] if item['unidad'] == 'Bolsas')
-    total_especies = len(set(item['especie'] for item in st.session_state.db['stock']))
-    
-    cols = st.columns(4)
-    cols[0].markdown(f'<div class="kpi-card"><span class="kpi-val" style="color:#e07b00">{total_bolsas}</span><span class="kpi-lbl">TOTAL BOLSAS</span></div>', unsafe_allow_html=True)
-    cols[1].markdown(f'<div class="kpi-card"><span class="kpi-val" style="color:#1a7abf">{total_especies}</span><span class="kpi-lbl">ESPECIES</span></div>', unsafe_allow_html=True)
-    cols[2].markdown(f'<div class="kpi-card"><span class="kpi-val" style="color:#2e8b57">OK</span><span class="kpi-lbl">ESTADO SISTEMA</span></div>', unsafe_allow_html=True)
-    cols[3].markdown(f'<div class="kpi-card"><span class="kpi-val" style="color:#7b4fa6">0</span><span class="kpi-lbl">PENDIENTES</span></div>', unsafe_allow_html=True)
-
-    st.markdown("---")
-    
-    # Filtros
-    f_col1, f_col2, f_col3 = st.columns([2, 1, 1])
-    search = f_col1.text_input("🔍 Buscar variedad o lote...")
-    campana_filter = f_col2.selectbox("Campaña", ["Todas", "23/24", "24/25"])
-    
-    # Tabla de Stock
-    df_stock = pd.DataFrame(st.session_state.db['stock'])
-    if search:
-        df_stock = df_stock[df_stock['variedad'].str.contains(search, case=False)]
-    
-    st.dataframe(df_stock, use_container_width=True, hide_index=True)
-
-# --- TAB: MOVIMIENTOS (INGRESOS/EGRESOS) ---
-with tab_movimientos:
-    st.subheader("Registrar Movimiento de Stock")
-    with st.form("form_movimiento"):
-        m_col1, m_col2, m_col3 = st.columns(3)
-        tipo = m_col1.selectbox("Tipo", ["Ingreso (+)", "Egreso (-)"])
-        especie = m_col2.selectbox("Especie", ["SOJA", "MAIZ", "TRIGO", "GIRASOL"])
-        variedad = m_col3.text_input("Variedad")
-        
-        cant = st.number_input("Cantidad", min_value=1)
-        obs = st.text_area("Observaciones / Destino")
-        
-        submit = st.form_submit_button("REGISTRAR MOVIMIENTO")
-        
-        if submit:
-            # Lógica para actualizar el stock (simplificada)
-            nuevo_mov = {
-                "fecha": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                "tipo": tipo,
-                "variedad": variedad,
-                "cantidad": cant,
-                "obs": obs
-            }
-            st.session_state.db['historial'].append(nuevo_mov)
-            st.success("Movimiento registrado correctamente.")
-
-# --- TAB: ÓRDENES DE CARGA ---
-with tab_ordenes:
-    st.subheader("Gestión de Órdenes de Carga")
-    st.info("Aquí se visualizan las órdenes generadas para despacho.")
-    if not st.session_state.db['ordenes']:
-        st.write("No hay órdenes pendientes.")
-    else:
-        st.table(st.session_state.db['ordenes'])
-
-# --- TAB: ADMIN ---
-with tab_admin:
-    st.subheader("Panel de Control")
-    col_adm1, col_adm2 = st.columns(2)
-    
-    with col_adm1:
-        st.markdown("### 📋 Catálogos")
-        st.text_input("Agregar Nueva Variedad")
-        st.button("Guardar en Catálogo")
-        
-    with col_adm2:
-        st.markdown("### 🔒 Seguridad")
-        st.text_input("Nueva Contraseña", type="password")
-        if st.button("Actualizar Acceso"):
-            st.toast("Contraseña actualizada")
-
-# --- FOOTER ---
-st.markdown(f"""
-    <div style="text-align:center; color: #6b7280; font-size: 0.8rem; margin-top: 50px; padding: 20px; border-top: 1px solid #dde1ea;">
-        Creado por Ignacio Diaz · {datetime.now().year} <br>
-        Sistema de Gestión de Semillas v2.1
-    </div>
-""", unsafe_allow_html=True)
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+</script>
+</body>
+</html>
