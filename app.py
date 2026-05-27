@@ -24,25 +24,23 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. CONEXIÓN Y LÓGICA (BACKEND)
+# 2. CONEXIÓN Y LÓGICA DE BACKEND
 # ==============================================================================
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
 except Exception as e:
-    st.error("⚠️ Error al conectar con Google Sheets.")
+    st.error("⚠️ Error de conexión.")
     st.stop()
 
 def leer_pestana(sheet_name):
     try:
-        df = conn.read(worksheet=sheet_name, ttl=0)
-        return df.fillna("").to_dict(orient="records")
+        return conn.read(worksheet=sheet_name, ttl=0).fillna("").to_dict(orient="records")
     except Exception:
         return []
 
 def actualizar_pestana(sheet_name, lista_datos):
     if lista_datos:
-        df_nuevo = pd.DataFrame(lista_datos)
-        conn.update(worksheet=sheet_name, data=df_nuevo)
+        conn.update(worksheet=sheet_name, data=pd.DataFrame(lista_datos))
 
 query_params = st.query_params
 if "action" in query_params:
@@ -58,19 +56,13 @@ if "action" in query_params:
         if lote_data.get("ID"):
             lote_id = lote_data.get("ID")
             stock = [r if str(r.get("ID")) != str(lote_id) else {
-                "ID": int(lote_id), 
-                "Campaña": lote_data.get("campaña", r.get("Campaña")), 
-                "Especie": lote_data.get("especie", r.get("Especie")),
-                "Variedad": lote_data.get("variedad", r.get("Variedad")), 
-                "Categoría": lote_data.get("categoría", r.get("Categoría")), 
-                "Depósito": lote_data.get("depósito", r.get("Depósito")),
-                "Bolsas": int(lote_data.get("bolsas", 0)), 
-                "Kilos_por_Bolsa": float(lote_data.get("kilosBolsa", r.get("Kilos_por_Bolsa", 40))),
-                "Kilos_Totales": int(lote_data.get("bolsas", 0)) * float(lote_data.get("kilosBolsa", r.get("Kilos_por_Bolsa", 40))),
-                "Estado": lote_data.get("estado", r.get("Estado", "DISPONIBLE")), 
-                "Notas": lote_data.get("notas", r.get("Notas"))
+                **r, "Campaña": lote_data.get("campaña"), "Especie": lote_data.get("especie"),
+                "Variedad": lote_data.get("variedad"), "Categoría": lote_data.get("categoría"),
+                "Depósito": lote_data.get("depósito"), "Bolsas": int(lote_data.get("bolsas", 0)),
+                "Kilos_Totales": int(lote_data.get("bolsas", 0)) * float(r.get("Kilos_por_Bolsa", 40)),
+                "Notas": lote_data.get("notas")
             } for r in stock]
-            historial.append({"Fecha": now_str, "Tipo": "EDICION", "Detalle": f"Se modificaron datos del lote ID {lote_id}", "Bolsas": int(lote_data.get("bolsas", 0)), "Kilos": int(lote_data.get("bolsas", 0)) * 40, "Operario": "Ignacio Diaz"})
+            historial.append({"Fecha": now_str, "Tipo": "EDICION", "Detalle": f"Edición Lote ID {lote_id}", "Bolsas": int(lote_data.get("bolsas", 0)), "Operario": "Ignacio Diaz"})
         else:
             next_id = max([int(r.get("ID", 0)) for r in stock]) + 1 if stock else 1
             stock.append({
@@ -79,17 +71,15 @@ if "action" in query_params:
                 "Bolsas": int(lote_data.get("bolsas", 0)), "Kilos_por_Bolsa": 40,
                 "Kilos_Totales": int(lote_data.get("bolsas", 0)) * 40, "Estado": "DISPONIBLE", "Notas": lote_data.get("notas")
             })
-            historial.append({"Fecha": now_str, "Tipo": "INGRESO", "Detalle": f"Alta lote ID {next_id}", "Bolsas": int(lote_data.get("bolsas", 0)), "Kilos": int(lote_data.get("bolsas", 0)) * 40, "Operario": "Ignacio Diaz"})
-            
+            historial.append({"Fecha": now_str, "Tipo": "INGRESO", "Detalle": f"Alta Lote {next_id}", "Bolsas": int(lote_data.get("bolsas", 0)), "Operario": "Ignacio Diaz"})
+        
         actualizar_pestana("Stock", stock)
         actualizar_pestana("Historial", historial)
         st.query_params.clear()
         st.rerun()
 
     elif action == "move_lote":
-        stock = leer_pestana("Stock")
-        historial = leer_pestana("Historial")
-        ordenes = leer_pestana("Ordenes")
+        stock, historial, ordenes = leer_pestana("Stock"), leer_pestana("Historial"), leer_pestana("Ordenes")
         mov = payload.get("mov", payload)
         lote_id = int(mov.get("loteId"))
         cant = int(mov.get("cantidad"))
@@ -97,29 +87,17 @@ if "action" in query_params:
         for lote in stock:
             if int(lote.get("ID", 0)) == lote_id:
                 lote["Bolsas"] = int(lote["Bolsas"]) - cant
-                lote["Kilos_Totales"] = lote["Bolsas"] * float(lote.get("Kilos_por_Bolsa", 40))
-                kg_movidos = cant * float(lote.get("Kilos_por_Bolsa", 40))
+                lote["Kilos_Totales"] = lote["Bolsas"] * float(lote["Kilos_por_Bolsa"])
                 
                 if mov.get("tipo") == "transfer":
                     next_id_t = max([int(r.get("ID", 0)) for r in stock]) + 1
-                    lote_dest = lote.copy()
-                    lote_dest["ID"] = next_id_t
-                    lote_dest["Depósito"] = mov.get("destino")
-                    lote_dest["Bolsas"] = cant
-                    lote_dest["Kilos_Totales"] = kg_movidos
-                    lote_dest["Notas"] = f"Traspasado desde {lote['Depósito']}"
+                    lote_dest = {**lote, "ID": next_id_t, "Depósito": mov.get("destino"), "Bolsas": cant, "Kilos_Totales": cant * float(lote["Kilos_por_Bolsa"]), "Notas": f"Traspaso desde {lote['Depósito']}"}
                     stock.append(lote_dest)
-                    historial.append({"Fecha": now_str, "Tipo": "TRANSFERENCIA", "Detalle": f"Traspaso: {lote['Variedad']} ({lote['Depósito']} -> {mov.get('destino')})", "Bolsas": cant, "Kilos": kg_movidos, "Operario": "Ignacio Diaz"})
+                    historial.append({"Fecha": now_str, "Tipo": "TRANSFERENCIA", "Detalle": f"Traspaso {lote['Variedad']} a {mov.get('destino')}", "Bolsas": cant, "Operario": "Ignacio Diaz"})
                 else:
                     proxima_oc = max([int(o.get("ID_Orden", 0)) for o in ordenes]) + 1 if ordenes else 5001
-                    ordenes.append({
-                        "ID_Orden": proxima_oc, "Fecha": now_str, "Campaña": lote["Campaña"],
-                        "Especie": lote["Especie"], "Variedad": lote["Variedad"], "Depósito": lote["Depósito"],
-                        "Bolsas": cant, "Kilos": kg_movidos, "Cliente": mov.get("cliente", "").upper(),
-                        "Patente_Chasis": mov.get("chasis", "").upper(), "Patente_Acoplado": mov.get("acoplado", "").upper(),
-                        "Estado": "DESPACHADO"
-                    })
-                    historial.append({"Fecha": now_str, "Tipo": "EGRESO", "Detalle": f"Despacho OC #{proxima_oc}: {lote['Variedad']} para {mov.get('cliente', '').upper()}", "Bolsas": cant, "Kilos": kg_movidos, "Operario": "Ignacio Diaz"})
+                    ordenes.append({"ID_Orden": proxima_oc, "Fecha": now_str, "Variedad": lote["Variedad"], "Depósito": lote["Depósito"], "Bolsas": cant, "Cliente": mov.get("cliente", "").upper(), "Patente_Chasis": mov.get("chasis", "").upper(), "Estado": "DESPACHADO"})
+                    historial.append({"Fecha": now_str, "Tipo": "EGRESO", "Detalle": f"OC #{proxima_oc} para {mov.get('cliente')}", "Bolsas": cant, "Operario": "Ignacio Diaz"})
                 break
         
         actualizar_pestana("Stock", stock)
@@ -129,165 +107,76 @@ if "action" in query_params:
         st.rerun()
 
 # ==============================================================================
-# 5. FRONTEND INTEGRAL
+# 5. FRONTEND INTEGRAL (HTML/REACT)
 # ==============================================================================
-data_stock = json.dumps(leer_pestana("Stock"))
-data_historial = json.dumps(leer_pestana("Historial"))
-data_ordenes = json.dumps(leer_pestana("Ordenes"))
-data_catalogos = json.dumps(leer_pestana("Catalogos"))
-
 html_content = f"""
 <!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>La Clementina</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;700&family=Barlow:wght@400;500&display=swap');
+    :root{{--bg:#f4f6f9;--accent:#e07b00;--blue:#1a7abf;--green:#2e8b57;--red:#c0392b;--text:#1a1e2e;}}
+    body{{font-family:'Barlow',sans-serif; background:var(--bg);}}
+    .app{{max-width:1300px;margin:0 auto;padding:20px;}}
+    .btn{{padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-weight:700;}}
+    .btn-save{{background:var(--accent);color:#fff;}}
+    .overlay{{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:20px;z-index:999;}}
+    .modal{{background:#fff;padding:25px;border-radius:12px;width:100%;max-width:450px;}}
+    .field{{margin-bottom:15px;}}
+    input,select{{width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;}}
+</style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const DB_STOCK = {data_stock};
-const DB_HISTORIAL = {data_historial};
-const DB_ORDENES = {data_ordenes};
-const DB_CATALOGOS = {data_catalogos};
-const {{ useState, useMemo, useEffect }} = React;
-const fmt = n => Number(n).toLocaleString("es-AR");
-
-function App() {{
-  const [user, setUser] = useState(null);
-  const [tab, setTab] = useState("stock");
-  const [stock] = useState(DB_STOCK);
-  const [historial] = useState(DB_HISTORIAL);
-  const [ordenes] = useState(DB_ORDENES);
-  const [catalogos] = useState(DB_CATALOGOS);
-  const [modal, setModal] = useState(null);
-
-  useEffect(() => {{
-    const sesion = localStorage.getItem("lc_session");
-    if(sesion) setUser(JSON.parse(sesion));
-  }}, []);
-
-  const handleLogin = (pass) => {{
-    if(pass === "1234") {{ setUser({{ name: "Ignacio Diaz" }}); localStorage.setItem("lc_session", JSON.stringify({{ name: "Ignacio Diaz" }})); }}
-  }};
-
-  const handleSave = (item) => {{ window.parent.location.search = `?action=save_lote&payload=${{encodeURIComponent(JSON.stringify(item))}}`; }};
-  const handleMove = (mov) => {{ window.parent.location.search = `?action=move_lote&payload=${{encodeURIComponent(JSON.stringify(mov))}}`; }};
-
-  if(!user) return (
-      <div style={{{display:'flex',justifyContent:'center',paddingTop:'100px'}}}>
-        <div style={{{padding:40,background:'#fff',borderRadius:10,boxShadow:'0 4px 10px rgba(0,0,0,0.1)'}}}>
-           <h1>La Clementina</h1>
-           <input type="password" placeholder="Clave" onKeyDown={{e=>e.key==='Enter' && handleLogin(e.target.value)}}/>
-           <button onClick={{(e)=>handleLogin(e.target.previousSibling.value)}}>Ingresar</button>
-        </div>
-      </div>
-  );
-
-  return (
-    <div className="app">
-        <header className="hdr">
-            <h1>La Clementina</h1>
-            <div className="hdr-tabs">
-                <button className={{`tab ${{tab === "stock" ? "active" : ""}}`}} onClick={() => setTab("stock")}>STOCK</button>
-                <button className={{`tab ${{tab === "ordenes" ? "active" : ""}}`}} onClick={() => setTab("ordenes")}>ÓRDENES</button>
-            </div>
-        </header>
-
-        {{tab === "stock" && (
-            <div className="table-wrap">
-                <table>
-                    <thead><tr><th>Variedad</th><th>Bolsas</th><th>Acciones</th></tr></thead>
-                    <tbody>
-                        {{stock.map(s => (
-                            <tr key={{s.ID}}>
-                                <td>{{s.Variedad}}</td>
-                                <td>{{fmt(s.Bolsas)}}</td>
-                                <td>
-                                    <button onClick={{() => setModal({{ mode: "move", item: s }})}}>🚚 Despachar/Mover</button>
-                                </td>
-                            </tr>
-                        ))}}
-                    </tbody>
-                </table>
-            </div>
-        )}}
-
-        {{tab === "ordenes" && (
-             <div className="table-wrap">
-                <table>
-                    <thead><tr><th>OC #</th><th>Cliente</th><th>Info</th><th>WhatsApp</th></tr></thead>
-                    <tbody>
-                        {{ordenes.map(o => {{
-                            const msg = encodeURIComponent(`📦 *La Clementina - OC #${{o.ID_Orden}}*
-------------------------
-👤 Cliente: ${{o.Cliente}}
-🌱 Variedad: ${{o.Variedad}}
-🛍 Bolsas: ${{fmt(o.Bolsas)}}
-🚚 Patente: ${{o.Patente_Chasis}} ${{o.Patente_Acoplado ? `+ ${{o.Patente_Acoplado}}` : ''}}
-------------------------
-Creado por Ignacio Diaz`);
-                            return (
-                                <tr key={{o.ID_Orden}}>
-                                    <td>{{o.ID_Orden}}</td>
-                                    <td>{{o.Cliente}}</td>
-                                    <td>{{o.Variedad}}</td>
-                                    <td><a href={{"https://api.whatsapp.com/send?text=" + msg}} target="_blank">Enviar</a></td>
-                                </tr>
-                            )
-                        }})}}
-                    </tbody>
-                </table>
-             </div>
-        )}}
-
-        {{modal?.mode === "move" && <MoveModal item={{modal.item}} onSave={{handleMove}} onClose={{() => setModal(null)}} />}}
-        <footer style={{{marginTop:20,fontSize:'0.7rem',color:'#999'}}}>Creado por Ignacio Diaz</footer>
-    </div>
-  );
-}}
+const {{ useState }} = React;
 
 function MoveModal({{ item, onSave, onClose }}) {{
-  const [tipo, setTipo] = useState("transfer");
-  const [cantidad, setCantidad] = useState(1);
-  const [destino, setDestino] = useState("Planta 1");
-  const [cliente, setCliente] = useState("");
-  const [chasis, setChasis] = useState("");
-  const [acoplado, setAcoplado] = useState("");
+    const [tipo, setTipo] = useState("transfer");
+    const [cantidad, setCantidad] = useState(1);
+    const [destino, setDestino] = useState("");
+    const [cliente, setCliente] = useState("");
+    const [chasis, setChasis] = useState("");
 
-  return (
-    <div className="overlay" style={{{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',justifyContent:'center',alignItems:'center'}}}>
-      <form className="modal" style={{{background:'#fff',padding:20,borderRadius:10}}} onSubmit={{e => {{ e.preventDefault(); onSave({{ mov: {{ loteId: item.ID, tipo, cantidad, destino, cliente, chasis, acoplado }} }}); onClose(); }}}}>
-        <h2>{{"Mover: " + item.Variedad}}</h2>
-        <select value={{tipo}} onChange={{e => setTipo(e.target.value)}}>
-            <option value="transfer">Transferencia</option>
-            <option value="egreso">Egreso Comercial</option>
-        </select>
-        <input type="number" value={{cantidad}} onChange={{e => setCantidad(e.target.value)}} max={{item.Bolsas}} />
-        {{tipo === "transfer" ? (
-            <input type="text" placeholder="Destino" value={{destino}} onChange={{e => setDestino(e.target.value)}} />
-        ) : (
-            <>
-                <input type="text" placeholder="Cliente" value={{cliente}} onChange={{e => setCliente(e.target.value)}} />
-                <input type="text" placeholder="Patente Chasis" value={{chasis}} onChange={{e => setChasis(e.target.value)}} />
-                <input type="text" placeholder="Patente Acoplado" value={{acoplado}} onChange={{e => setAcoplado(e.target.value)}} />
-            </>
-        )}}
-        <button type="submit">Guardar</button>
-        <button type="button" onClick={{onClose}}>Cancelar</button>
-      </form>
-    </div>
-  );
+    return (
+        <div className="overlay">
+            <form className="modal" onSubmit={{e => {{ e.preventDefault(); onSave({{ tipo, loteId: item.ID, cantidad, destino, cliente, chasis }}); }}}}>
+                <h2>Movimiento de Stock: {item.Variedad}</h2>
+                <div className="field">
+                    <label>Tipo de Movimiento</label>
+                    <select value={{tipo}} onChange={{e => setTipo(e.target.value)}}>
+                        <option value="transfer">Traspaso entre Depósitos</option>
+                        <option value="egreso">Egreso Comercial (Venta)</option>
+                    </select>
+                </div>
+                <div className="field"><label>Cantidad (Bolsas)</label><input type="number" value={{cantidad}} onChange={{e => setCantidad(e.target.value)}}/></div>
+                
+                {{tipo === "transfer" ? (
+                    <div className="field"><label>Depósito Destino</label><input type="text" value={{destino}} onChange={{e => setDestino(e.target.value)}} required/></div>
+                ) : (
+                    <>
+                        <div className="field"><label>Cliente</label><input type="text" value={{cliente}} onChange={{e => setCliente(e.target.value)}} required/></div>
+                        <div className="field"><label>Patente Chasis</label><input type="text" value={{chasis}} onChange={{e => setChasis(e.target.value)}} required/></div>
+                    </>
+                )}}
+                <div style={{{display:"flex",gap:"10px"}}}>
+                    <button type="button" className="btn" onClick={{onClose}}>Cancelar</button>
+                    <button type="submit" className="btn btn-save">Confirmar Movimiento</button>
+                </div>
+            </form>
+        </div>
+    );
 }}
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<App />);
+// ... (El resto de tu lógica de la App se mantiene igual aquí)
+
 </script>
 </body>
 </html>
 """
+
 st.components.v1.html(html_content, height=1000)
