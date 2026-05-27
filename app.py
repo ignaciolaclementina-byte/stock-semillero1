@@ -5,7 +5,7 @@ import json
 from datetime import datetime
 
 # ==============================================================================
-# 1. CONFIGURACIÓN DEL PANEL DE STREAMLIT (INTERFAZ COMPLETA E INVISIBLE)
+# 1. CONFIGURACIÓN DEL PANEL DE STREAMLIT (INTERFAZ NATIVA COMPLETA)
 # ==============================================================================
 st.set_page_config(
     page_title="La Clementina · Stock Semillas",
@@ -14,7 +14,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Inyección de estilos para ocultar componentes de Streamlit y dar aspecto nativo
+# Ocultamos los componentes por defecto de Streamlit
 st.markdown("""
     <style>
         .block-container { padding: 0rem !important; max-width: 100% !important; }
@@ -46,7 +46,7 @@ def actualizar_pestana(sheet_name, lista_datos):
         conn.update(worksheet=sheet_name, data=df_nuevo)
 
 # ==============================================================================
-# 3. PROCESAMIENTO DE ACCIONES (BRIDGE DE COMUNICACIÓN API DESDE EL FRONTEND)
+# 3. PROCESAMIENTO DE ACCIONES (BRIDGE DE COMUNICACIÓN API DESDE FRONTEND)
 # ==============================================================================
 query_params = st.query_params
 
@@ -61,7 +61,6 @@ if "action" in query_params:
         historial = leer_pestana("Historial")
         lote_data = payload.get("item", payload)
         
-        # Si tiene ID es una edición, sino es un nuevo ingreso
         if lote_data.get("ID") or lote_data.get("id"):
             lote_id = lote_data.get("ID") or lote_data.get("id")
             stock = [r if str(r.get("ID")) != str(lote_id) else {
@@ -163,14 +162,8 @@ if "action" in query_params:
         st.query_params.clear()
         st.rerun()
 
-    # ACCIÓN: ELIMINAR / ACTUALIZAR CATÁLOGOS DIRECTAMENTE
-    elif action == "update_catalogos":
-        actualizar_pestana("Catalogos", payload.get("catalogos", []))
-        st.query_params.clear()
-        st.rerun()
-
 # ==============================================================================
-# 4. EXTRACCIÓN Y PREPARACIÓN DE DATOS DESDE GOOGLE SHEETS
+# 4. EXTRACCIÓN DE DATOS DESDE GOOGLE SHEETS
 # ==============================================================================
 data_stock = leer_pestana("Stock")
 data_historial = leer_pestana("Historial")
@@ -183,7 +176,7 @@ js_ordenes = json.dumps(data_ordenes) if data_ordenes else "[]"
 js_catalogos = json.dumps(data_catalogos) if data_catalogos else "[]"
 
 # ==============================================================================
-# 5. CODIGO DEL FRONTEND INTEGRAL (HTML5 + REACT ENTERO)
+# 5. FRONTEND INTEGRAL COMPLETO (HTML5 + REACT SEGURO SIN % DE PYTHON)
 # ==============================================================================
 html_content = """
 <!DOCTYPE html>
@@ -195,6 +188,12 @@ html_content = """
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+
+<script id="data-stock" type="application/json">""" + js_stock + """</script>
+<script id="data-historial" type="application/json">""" + js_historial + """</script>
+<script id="data-ordenes" type="application/json">""" + js_ordenes + """</script>
+<script id="data-catalogos" type="application/json">""" + js_catalogos + """</script>
+
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500&display=swap');
 :root{
@@ -299,10 +298,11 @@ td{padding:8px 10px;vertical-align:middle}
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const DB_STOCK = %s;
-const DB_HISTORIAL = %s;
-const DB_ORDENES = %s;
-const DB_CATALOGOS = %s;
+// Recuperamos la data de los nodos DOM limpios de forma 100% segura
+const DB_STOCK = JSON.parse(document.getElementById('data-stock').textContent);
+const DB_HISTORIAL = JSON.parse(document.getElementById('data-historial').textContent);
+const DB_ORDENES = JSON.parse(document.getElementById('data-ordenes').textContent);
+const DB_CATALOGOS = JSON.parse(document.getElementById('data-catalogos').textContent);
 
 const { useState, useMemo, useEffect } = React;
 const LOW = 5;
@@ -609,7 +609,7 @@ root.render(<App />);
 </script>
 </body>
 </html>
-""" % (js_stock, js_historial, js_ordenes, js_catalogos)
+"""
 
-# Renderizado de pantalla completa asegurado
+# Renderizado de pantalla completa limpio y directo
 st.components.v1.html(html_content, height=1200, scrolling=True)
