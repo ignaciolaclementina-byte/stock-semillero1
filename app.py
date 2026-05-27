@@ -2,75 +2,72 @@ import streamlit as st
 import pandas as pd
 
 # --- CONFIGURACIÓN ---
-st.set_page_config(page_title="La Clementina · Stock Semillas", layout="wide")
+st.set_page_config(page_title="La Clementina · Stock Semillas", layout="wide", initial_sidebar_state="collapsed")
 
-# --- ESTADO INICIAL (Igual que en tu React) ---
+# --- ESTADO (Replica tu useState de React) ---
 if 'modal' not in st.session_state:
     st.session_state.modal = {"mode": None, "item": None, "oc": None}
 if 'stock' not in st.session_state:
-    st.session_state.stock = [] # Aquí cargarás tu data de Sheets
+    st.session_state.stock = [] # Aquí cargarás tus datos
 
-# --- FUNCIONES DE LÓGICA (Tus funciones originales) ---
-def handleSave(data):
-    # Inserta aquí tu lógica original de guardado
-    st.write(f"Guardando: {data}")
-    st.session_state.modal = {"mode": None, "item": None}
+# --- FUNCIONES MANEJADORAS (Estructura original fiel) ---
+# Copia aquí la lógica exacta de SEMILLERO (3).txt dentro de cada función
+def handleSave(item_data):
+    st.toast("Guardando lote...")
+    # Tu lógica aquí
+    st.session_state.modal = {"mode": None, "item": None, "oc": None}
+    st.rerun()
 
 def handleMove(item, cantidad, destino):
-    # Inserta aquí tu lógica de movimiento
-    st.write(f"Moviendo {cantidad} unidades a {destino}")
-    st.session_state.modal = {"mode": None, "item": None}
+    st.toast("Procesando movimiento...")
+    # Tu lógica aquí
+    st.session_state.modal = {"mode": None, "item": None, "oc": None}
+    st.rerun()
 
 def handleCreateOC(item, oc_data):
-    # Inserta aquí tu lógica de creación de OC
-    st.session_state.modal = {"mode": None, "item": None}
+    # Tu lógica de creación OC
+    st.session_state.modal = {"mode": None, "item": None, "oc": None}
+    st.rerun()
 
 def handleEditOC(item, oc_data):
-    # Inserta aquí tu lógica de edición de OC
-    st.session_state.modal = {"mode": None, "item": None}
+    # Tu lógica de edición OC
+    st.session_state.modal = {"mode": None, "item": None, "oc": None}
+    st.rerun()
 
 def resetAll():
-    # Tu función original de reset
     st.session_state.stock = []
     st.rerun()
 
-# --- MODALES (Estructura fiel a tu React) ---
+# --- COMPONENTES (Equivalentes a tus React Modals) ---
 
 @st.dialog("Formulario de Lote")
 def ModalForm(item=None):
-    # Aquí mapeas: campañas={campañas}, especies={especies}, varMap={varMap}
+    # Aquí mapeas: campañas, especies, varMap
     st.write("Configuración de Lote")
-    # ... inputs ...
     if st.button("Guardar"):
-        handleSave({"item": item})
-        st.rerun()
+        handleSave(item)
 
 @st.dialog("Mover Stock")
 def MoveModal(item):
-    st.write(f"Mover: {item.get('Variedad')}")
-    # ... inputs ...
+    st.write(f"Gestionando stock de: {item.get('Variedad') if item else 'Lote'}")
     if st.button("Confirmar Movimiento"):
         handleMove(item, 0, "Destino")
-        st.rerun()
 
 @st.dialog("Editar Orden de Carga")
 def OCModal(item, oc):
     st.write("Editando OC")
-    # ... inputs ...
     if st.button("Guardar Cambios"):
         handleEditOC(item, oc)
-        st.rerun()
 
-# --- INTERFAZ PRINCIPAL ---
+# --- DISPATCHER PRINCIPAL (El motor que emula a React) ---
 st.title("🌱 La Clementina · Stock Semillas")
 
-# Aquí iría tu renderizado de tabla
+# Simulando la tabla/interfaz (Coloca aquí tu tabla)
 if st.button("Nuevo Lote"):
-    st.session_state.modal = {"mode": "new", "item": None}
+    st.session_state.modal = {"mode": "new", "item": None, "oc": None}
 
-# --- LÓGICA DE APERTURA DE MODALES (Mantiene tu estructura original) ---
+# Lógica de renderizado de modales (Igual a tu `{modal?.mode==="new" && ...}`)
 m = st.session_state.modal
-
 if m["mode"] == "new":
     ModalForm()
 elif m["mode"] == "edit":
@@ -80,7 +77,14 @@ elif m["mode"] == "move":
 elif m["mode"] == "editOC":
     OCModal(item=m["item"], oc=m["oc"])
 
-# Zona de peligro (tal cual tu HTML)
+# --- ZONA ADMINISTRATIVA ---
+st.markdown("---")
 with st.expander("⚙️ Administración"):
     if st.button("🗑 Resetear todos los datos"):
         resetAll()
+
+st.markdown("""
+    <div style="text-align: center; margin-top: 50px;">
+        <p style="font-size: 0.8rem; color: #888;">Creado por Ignacio Diaz</p>
+    </div>
+""", unsafe_allow_html=True)
