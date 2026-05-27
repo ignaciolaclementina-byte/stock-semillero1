@@ -88,12 +88,11 @@ def get_dataframe(sheet_name):
         return pd.DataFrame()
 
 def append_row(sheet_name, row_list, df_actual):
-    # Crear un DataFrame de una fila con los mismos encabezados
     nueva_fila = pd.DataFrame([row_list], columns=df_actual.columns)
     df_actualizado = pd.concat([df_actual, nueva_fila], ignore_index=True)
     conn.update(worksheet=sheet_name, data=df_actualizado)
 
-# 3. CONTROL DE ACCESO (Mismo sistema de login)
+# 3. CONTROL DE ACCESO
 if 'authenticated' not in st.session_state:
     st.session_state['authenticated'] = False
 
@@ -145,7 +144,7 @@ with m1:
 with m2:
     st.markdown(f'<div class="kpi-card"><span style="color:#1a7abf; font-size:2rem; font-weight:800;">{tot_kilos/1000:,.2f} Tn</span><br><small style="color:#6b7280; font-weight:600;">MERCADERÍA DISPONIBLE</small></div>', unsafe_allow_html=True)
 with m3:
-    st.markdown(f'<div class="kpi-card"><span style="color:#2e8b57; font-size:2rem; font-weight:800;">{tot_ocs}</span><br><small style="color:#6b7280; font-weight:600;">%s</small></div>' % "ÓRDENES DE DESPACHO", unsafe_allow_html=True)
+    st.markdown(f'<div class="kpi-card"><span style="color:#2e8b57; font-size:2rem; font-weight:800;">{tot_ocs}</span><br><small style="color:#6b7280; font-weight:600;">ÓRDENES DE DESPACHO</small></div>', unsafe_allow_html=True)
 
 st.write("")
 
@@ -269,14 +268,13 @@ with tab_movimiento:
                 now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
                 kilogramos_mov = cant_mover * float(datos_origen['Kilos_por_Bolsa'])
                 
-                # Modificar el stock local en memoria
+                # Modificar stock local
                 df_stock.loc[df_stock['ID'] == lote_id_real, 'Bolsas'] = int(datos_origen['Bolsas']) - cant_mover
                 df_stock.loc[df_stock['ID'] == lote_id_real, 'Kilos_Totales'] = (int(datos_origen['Bolsas']) - cant_mover) * float(datos_origen['Kilos_por_Bolsa'])
                 
                 if modalidad == "Transferencia entre Plantas / Depósitos":
                     next_id_t = int(df_stock['ID'].max()) + 1 if 'ID' in df_stock.columns else 1
                     
-                    # Guardar tabla Stock con descuento y nueva fila de transferencia
                     nueva_fila_stock = pd.DataFrame([[
                         next_id_t, datos_origen['Campaña'], datos_origen['Especie'], 
                         datos_origen['Variedad'], datos_origen['Categoría'], destino_dep, 
@@ -289,10 +287,8 @@ with tab_movimiento:
                     st.success(f"¡Transferencia exitosa! Las existencias se reubicaron en {destino_dep}.")
                     st.rerun()
                 else:
-                    # Guardar tabla Stock con el descuento aplicado
                     conn.update(worksheet="Stock", data=df_stock)
                     
-                    # Generar Orden de Carga Correlativa
                     proxima_oc = int(df_ordenes['ID_Orden'].max()) + 1 if not df_ordenes.empty and 'ID_Orden' in df_ordenes.columns else 5001
                     
                     append_row("Ordenes", [
@@ -303,7 +299,7 @@ with tab_movimiento:
                     
                     append_row("Historial", [now_str, "EGRESO", f"Despacho OC #{proxima_oc}: {cant_mover} bols entregadas a {cliente_oc}", cant_mover, kilogramos_mov, "Ignacio Diaz"], df_historial)
                     
-                    # WhatsApp estructurado profesionalmente
+                    # WhatsApp estructurado
                     texto_wa = (
                         f"🌱 *LA CLEMENTINA · ORDEN DE CARGA #{proxima_oc}*\n\n"
                         f"📅 *Fecha:* {now_str}\n"
@@ -312,7 +308,7 @@ with tab_movimiento:
                         f"🏢 *Origen:* {datos_origen['Depósito']}\n"
                         f"👤 *Destino/Cliente:* {cliente_oc}\n"
                         f"🚛 *Transporte:* Chasis: {patente_c or 'N/C'} | Acoplado: {patente_a or 'N/C'}\n\n"
-                        f"✅ *Despacho autorizado por Ignacio Diaz*"
+                        f"✅ *Despacho authorized por Ignacio Diaz*"
                     )
                     wa_url = f"https://wa.me/?text={urllib.parse.quote(texto_wa)}"
                     
