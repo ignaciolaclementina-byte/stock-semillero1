@@ -8,7 +8,7 @@ from datetime import datetime
 # 1. CONFIGURACIÓN
 # ==============================================================================
 st.set_page_config(page_title="La Clementina · Stock Semillas", layout="wide", initial_sidebar_state="collapsed")
-st.markdown("""<style>.block-container{padding:0!important;max-width:100%!important;}[data-testid="stHeader"]{display:none!important;footer{visibility:hidden!important;}</style>""", unsafe_allow_html=True)
+st.markdown("""<style>.block-container{padding:0!important;max-width:100%!important;}[data-testid="stHeader"]{display:none!important;} footer{visibility:hidden!important;}</style>""", unsafe_allow_html=True)
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
@@ -20,7 +20,7 @@ def actualizar_pestana(sheet_name, lista_datos):
     if lista_datos: conn.update(worksheet=sheet_name, data=pd.DataFrame(lista_datos))
 
 # ==============================================================================
-# 2. PROCESAMIENTO DE ACCIONES (BACKEND)
+# 2. PROCESAMIENTO DE ACCIONES
 # ==============================================================================
 query_params = st.query_params
 if "action" in query_params:
@@ -30,7 +30,6 @@ if "action" in query_params:
     
     if action == "save_lote":
         stock = leer_pestana("Stock")
-        historial = leer_pestana("Historial")
         lote_data = payload.get("item", payload)
         if lote_data.get("ID"):
             stock = [r if str(r.get("ID")) != str(lote_data["ID"]) else {**r, **lote_data} for r in stock]
@@ -43,10 +42,8 @@ if "action" in query_params:
 
     elif action == "move_lote":
         stock = leer_pestana("Stock")
-        historial = leer_pestana("Historial")
         ordenes = leer_pestana("Ordenes")
         mov = payload.get("mov", payload)
-        
         for lote in stock:
             if int(lote.get("ID", 0)) == int(mov.get("loteId")):
                 lote["Bolsas"] = int(lote["Bolsas"]) - int(mov.get("cantidad"))
@@ -64,11 +61,9 @@ if "action" in query_params:
         st.rerun()
 
 # ==============================================================================
-# 3. FRONTEND (REACT INTEGRADO)
+# 3. FRONTEND
 # ==============================================================================
 js_stock = json.dumps(leer_pestana("Stock"))
-js_historial = json.dumps(leer_pestana("Historial"))
-js_ordenes = json.dumps(leer_pestana("Ordenes"))
 
 html_content = f"""
 <!DOCTYPE html>
@@ -77,7 +72,11 @@ html_content = f"""
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
-    <style>body{{font-family:sans-serif; background:#f4f6f9; padding:20px;}} .modal{{background:white; padding:20px; border-radius:10px; position:fixed; top:20%; left:30%; width:40%; z-index:1000;}} .overlay{{position:fixed; inset:0; background:rgba(0,0,0,0.5);}}</style>
+    <style>
+        body{{font-family:sans-serif; background:#f4f6f9; padding:20px;}}
+        .modal{{background:white; padding:20px; border-radius:10px; position:fixed; top:20%; left:30%; width:40%; z-index:1000; box-shadow:0 0 10px rgba(0,0,0,0.2);}}
+        .overlay{{position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:999;}}
+    </style>
 </head>
 <body>
     <div id="root"></div>
@@ -124,7 +123,9 @@ html_content = f"""
                 </div>
             );
         }}
-        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+        const container = document.getElementById('root');
+        const root = ReactDOM.createRoot(container);
+        root.render(<App />);
     </script>
 </body>
 </html>
