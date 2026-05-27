@@ -5,14 +5,14 @@ from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
 
 # ==============================================================================
-# 1. CONFIGURACIÓN Y CONEXIÓN ROBUSTA
+# 1. CONFIGURACIÓN Y CONEXIÓN SEGURA
 # ==============================================================================
 st.set_page_config(page_title="La Clementina · Stock", layout="wide", initial_sidebar_state="collapsed")
 
-# Inicialización segura de la conexión
+# Inicialización segura
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
-except Exception:
+except:
     conn = None
 
 def leer_datos(sheet_name):
@@ -27,10 +27,11 @@ def guardar_datos(sheet_name, lista_datos):
         conn.update(worksheet=sheet_name, data=pd.DataFrame(lista_datos))
 
 # ==============================================================================
-# 2. PROCESAMIENTO DE ACCIONES (BACKEND)
+# 2. PROCESAMIENTO DE ACCIONES (CORREGIDO)
 # ==============================================================================
+# USAMOS .get() PARA EVITAR EL ERROR DE NoneType
 params = st.query_params
-action = params.get("action")
+action = params.get("action") 
 
 if action:
     raw_payload = params.get("payload", "{}")
@@ -40,13 +41,11 @@ if action:
     
     now = datetime.now().strftime("%d/%m/%Y %H:%M")
     
-    # Lógica de Guardado (Save/Edit)
     if action == "save_lote":
         stock = leer_datos("Stock")
         historial = leer_datos("Historial")
         item = payload.get("item", {})
         
-        # Actualización o Nuevo
         if item.get("ID"):
             stock = [item if str(r.get("ID")) == str(item.get("ID")) else r for r in stock]
             historial.append({"Fecha": now, "Tipo": "EDICION", "Detalle": f"Modificó {item.get('Variedad')}", "Operario": "Ignacio Diaz"})
@@ -60,12 +59,9 @@ if action:
         st.query_params.clear()
         st.rerun()
 
-    # Lógica de Movimientos
     elif action == "move_lote":
         stock = leer_datos("Stock")
-        ordenes = leer_datos("Ordenes")
         mov = payload.get("mov", {})
-        
         if mov:
             lote_id = int(mov.get("loteId", 0))
             cant = int(mov.get("cantidad", 0))
@@ -78,36 +74,35 @@ if action:
         st.rerun()
 
 # ==============================================================================
-# 3. INTERFAZ (FRONTEND REACT)
+# 3. INTERFAZ FRONTEND
 # ==============================================================================
+# Cargamos los datos para inyectar en el JS
+data_stock = json.dumps(leer_datos("Stock"))
+
 html_code = f"""
 <!DOCTYPE html>
 <html>
-<head>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <style>
-        body {{ font-family: sans-serif; background: #f4f6f9; padding: 20px; }}
-        .card {{ background: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }}
-    </style>
-</head>
 <body>
     <div id="root"></div>
+    <script>
+        const DB_STOCK = {data_stock};
+    </script>
     <script type="text/babel">
         function App() {{
             return (
-                <div className="card">
+                <div style={{{{padding: "20px", background: "white", borderRadius: "8px"}}}}>
                     <h1>La Clementina · Control de Semillas</h1>
-                    <p>Creado por Ignacio Diaz</p>
-                    <hr/>
                     <p>Estado del sistema: <b>Conectado</b></p>
+                    <p>Lotes actuales: {{DB_STOCK.length}}</p>
                 </div>
             );
         }}
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </body>
 </html>
 """
