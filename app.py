@@ -392,4 +392,309 @@ const fmt = n => Number(n).toLocaleString("es-AR");
 const today = () => new Date().toISOString().slice(0,10);
 const nowStr = () => new Date().toLocaleString("es-AR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
 const printDate = () => new Date().toLocaleDateString("es-AR",{day:"2-digit",month:"long",year:"numeric"});
-const LOGO_SRC = "data:image/png;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCACmAk8DASIAAhEBAxEB/8QAHQABAAMBAQEBAQEAAAAAAAAAAAYHCAQFAwkCAf/EAEsQAAEDAgICDAcQAAYCAwAAAAEAAgMEBQYRIZIHCBIVFjE1QVFUstITN1Nhc3SBFCIyNlVxcnWCkZOhsbPBwiMzQlJi0ZSiGCTw/8QAHAEBAAIDAQEBAAAAAAAAAAAAAAMEAgYHAQUI/8QAQBEAAQIDBAYGBwcEAgMAAAAAAAECAwQRBRITUQYUITEycRY0QVJToQcVFzNhscEiNXKBkdHhI0JDgvDxVKLi/9oADAMBAAIRAxEAPwAiKy7NaLXLaKKSSgp3PfTsc5xjGZJaMyvg27b0KxobIkRquvLTYXpGRdOOVrVpQrRFau8to+TaX8MJvLaPk2l/DC1n2iyfgu8j6PR+L308yqkVq7y2j5Npfwwm8to+TaX8MJ7RZPwXeQ6Pxe+nmVUitXeW0fJtフ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
+const LOGO_SRC = "data:image/png;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCACmAk8DASIAAhEBAxEB/8QAHQABAAMBAQEBAQEAAAAAAAAAAAYHCAQFAwkCAf/EAEsQAAEDAgICDAcQAAYCAwAAAAEAAgMEBQYRIZIHCBIVFjE1QVFUstITN1Nhc3SBFCIyNlVxcnWCkZOhsbPBwiMzQlJi0ZSiGCTw/8QAHAEBAAIDAQEBAAAAAAAAAAAAAAMEAgYHAQUI/8QAQBEAAQIDBAYGBwcEAgMAAAAAAAECAwQRBRITUQYUITEycRY0QVJToQcVFzNhscEiNXKBkdHhI0JDgvDxVKLi/9oADAMBAAIRAxEAPwAiKy7NaLXLaKKSSgp3PfTsc5xjGZJaMyvg27b0KxobIkRquvLTYXpGRdOOVrVpQrRFau8to+TaX8MJvLaPk2l/DC1n2iyfgu8j6PR+L308yqkVq7y2j5Npfwwm8to+TaX8MJ7RZPwXeQ6Pxe+nmVUitXeW0fJtフ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";
+const varMap = {
+  "SOJA": ["Variedad A", "Variedad B", "Variedad C"],
+  "MAIZ": ["Híbrido X", "Híbrido Y"],
+  "TRIGO": ["Baguette 11", "Algarrobo"]
+};
+
+// ==============================================================================
+// PARTE 1: COMPONENTES PRINCIPALES DE LA INTERFAZ (REACT DE TU ARCHIVO HTML)
+// ==============================================================================
+function App() {
+  const [tab, setTab] = useState("stock");
+  const [stock, setStock] = useState(DB_STOCK);
+  const [historial, setHistorial] = useState(DB_HISTORIAL);
+  const [ordenes, setOrdenes] = useState(DB_ORDENES);
+  const [catalogos, setCatalogos] = useState(DB_CATALOGOS);
+  const [search, setSearch] = useState("");
+  const [modal, setModal] = useState(null);
+
+  // Filtros dinámicos de los catálogos cargados en Google Sheets
+  const campañas = useMemo(() => catalogos.filter(c => c.Tipo === "Campaña").map(c => c.Valor), [catalogos]);
+  const especies = useMemo(() => catalogos.filter(c => c.Tipo === "Especie").map(c => c.Valor), [catalogos]);
+
+  // KPIs Inteligentes
+  const kpis = useMemo(() => {
+    let totBolsas = 0, totKilos = 0, bajoStock = 0;
+    stock.forEach(item => {
+      const b = parseInt(item.Bolsas) || 0;
+      totBolsas += b;
+      totKilos += parseFloat(item.Kilos_Totales) || 0;
+      if (b <= LOW) bajoStock++;
+    });
+    return { bolsas: fmt(totBolsas), kilos: fmt(totKilos), bajo: bajoStock, ocs: ordenes.length };
+  }, [stock, ordenes]);
+
+  // Puentes de comunicación con el Backend en Python para salvar datos sin desloguear
+  const handleSave = useCallback((item) => {
+    window.parent.location.search = `?action=save_lote&payload=${encodeURIComponent(JSON.stringify({ item }))}`;
+  }, []);
+
+  const handleMove = useCallback((mov) => {
+    window.parent.location.search = `?action=move_lote&payload=${encodeURIComponent(JSON.stringify({ mov }))}`;
+  }, []);
+
+  return (
+    <div className="app">
+      {/* HEADER DE LA APLICACIÓN */}
+      <header className="hdr no-print">
+        <div className="hdr-left">
+          <img src={LOGO_SRC} alt="La Clementina" className="hdr-logo"/>
+          <div>
+            <h1>La Clementina <span>· Control de Stock</span></h1>
+            <p>Conectado directamente a Google Sheets · Producción Activa</p>
+          </div>
+        </div>
+        <div className="hdr-tabs">
+          <button className={`tab ${tab==="stock"?"active":""}`} onClick={()=>setTab("stock")}>📊 Stock General</button>
+          <button className={`tab ${tab==="resumen"?"active":""}`} onClick={()=>setTab("resumen")}>🔍 Vista Lotes</button>
+          <button className={`tab ${tab==="historial"?"active":""}`} onClick={()=>setTab("historial")}>📜 Historial</button>
+          <button className={`tab ${tab==="ordenes"?"active":""}`} onClick={()=>setTab("ordenes")}>🚚 Órdenes de Carga</button>
+        </div>
+      </header>
+
+      {/* STRIP DE KPIs GENERALES */}
+      <section className="kpi-strip no-print">
+        <div className="kpi"><div className="kpi-val c-or">{kpis.bolsas}</div><div className="kpi-lbl">Bolsas Totales</div></div>
+        <div className="kpi"><div className="kpi-val c-bl">{kpis.kilos}</div><div className="kpi-lbl">Kilos Netos</div></div>
+        <div className="kpi"><div className="kpi-val c-gr">{kpis.ocs}</div><div className="kpi-lbl">Órdenes Emitidas</div></div>
+        <div className="kpi"><div className="kpi-val c-pu">{kpis.bajo}</div><div className="kpi-lbl">Lotes Críticos (≤5)</div></div>
+      </section>
+
+      {/* RENDERIZADO DE PESTAÑAS SEGÚN EL STATE DE REACT */}
+      {tab === "stock" && (
+        <div className="stock-view">
+          <div className="toolbar no-print">
+            <div className="search-wrap">
+              <input type="text" className="search-inp" placeholder="Buscar por variedad, lote, depósito..." value={search} onChange={e=>setSearch(e.target.value)}/>
+            </div>
+            <button className="btn btn-add" onClick={()=>setModal({mode:"new"})}>➕ Cargar Nuevo Lote</button>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th><th>Campaña</th><th>Especie</th><th>Variedad</th><th>Categoría</th><th>Depósito</th><th>Bolsas</th><th>Kg/Bolsa</th><th>Kg Totales</th><th>Estado</th><th className="no-print">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stock.filter(s => s.Variedad.toLowerCase().includes(search.toLowerCase()) || s.Depósito.toLowerCase().includes(search.toLowerCase())).map(item => (
+                  <tr key={item.ID} className={item.Bolsas <= LOW ? "low-row" : ""}>
+                    <td><b>{item.ID}</b></td><td>{item.Campaña}</td><td><span className="badge bb">{item.Especie}</span></td><td>{item.Variedad}</td><td>{item.Categoría}</td><td>{item.Depósito}</td><td className="qty-big">{fmt(item.Bolsas)}</td><td>{item.Kilos_por_Bolsa}</td><td>{fmt(item.Kilos_Totales)}</td><td><span className="badge tr-b">{item.Estado}</span></td>
+                    <td className="no-print">
+                      <button className="action-btn" onClick={()=>setModal({mode:"edit", item})}>✏️</button>
+                      <button className="action-btn dep" onClick={()=>setModal({mode:"move", item})}>🚚 Movimiento</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* DETALLE DE VISTA DE LOTES (RESUMEN TARJETAS AGRUPADAS) */}
+      {tab === "resumen" && (
+        <div className="stock-view">
+          <div className="sv-grid">
+            {stock.map(item => (
+              <div className="sv-card" key={item.ID}>
+                <div className="sv-head">
+                  <div className="sv-variedad">{item.Variedad}</div>
+                  <span className="badge bo">{item.Campaña}</span>
+                </div>
+                <div className="sv-row"><span className="sv-label">Depósito:</span><span className="sv-val">{item.Depósito}</span></div>
+                <div className="sv-row"><span className="sv-label">Bolsas Disponibles:</span><span className="sv-val c-or">{fmt(item.Bolsas)}</span></div>
+                <div className="sv-row"><span className="sv-label">Total Kilos:</span><span className="sv-val">{fmt(item.Kilos_Totales)} kg</span></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* PESTAÑA HISTORIAL */}
+      {tab === "historial" && (
+        <div className="hist-view">
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Fecha/Hora</th><th>Tipo de Operación</th><th>Detalle de Movimiento</th><th>Bolsas</th><th>Kilos</th><th>Operario</th></tr>
+              </thead>
+              <tbody>
+                {historial.map((h, idx) => (
+                  <tr key={idx}>
+                    <td className="cell-muted">{h.Fecha}</td>
+                    <td><span className={`badge ${h.Tipo==="INGRESO"?"ing":"egr"}`}>{h.Tipo}</span></td>
+                    <td>{h.Detalle}</td><td>{fmt(h.Bolsas)}</td><td>{fmt(h.Kilos)}</td><td><b>{h.Operario}</b></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* PESTAÑA ÓRDENES DE CARGA (LOGÍSTICA / WHATSAPP INTEGRADO) */}
+      {tab === "ordenes" && (
+        <div className="oc-view">
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr><th>OC #</th><th>Fecha</th><th>Variedad</th><th>Depósito</th><th>Bolsas</th><th>Destinatario / Cliente</th><th>Patentes</th><th>Estado</th><th className="no-print">Notificar</th></tr>
+              </thead>
+              <tbody>
+                {ordenes.map(o => {
+                  const wsMsg = `La Clementina - Orden de Carga %23${o.ID_Orden}%0ACliente: ${o.Cliente}%0AVariedad: ${o.Variedad}%0ABolsas: ${o.Bolsas}%0APatentes: ${o.Patente_Chasis} / ${o.Patente_Acoplado}`;
+                  return (
+                    <tr key={o.ID_Orden}>
+                      <td><b>#{o.ID_Orden}</b></td><td>{o.Fecha}</td><td>{o.Variedad}</td><td>{o.Depósito}</td><td className="qty-big">{fmt(o.Bolsas)}</td><td>{o.Cliente}</td><td><span className="cell-muted">{o.Patente_Chasis} / {o.Patente_Acoplado}</span></td><td><span className="badge desp">{o.Estado}</span></td>
+                      <td className="no-print">
+                        <a href={`https://api.whatsapp.com/send?text=${wsMsg}`} target="_blank" rel="noreferrer" className="btn btn-ol gnh btn-sm">💬 WhatsApp</a>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* MODALES FLUIDOS DE ALTA Y EDICIÓN */}
+      {modal?.mode === "new" && <ModalForm campañas={campañas} especies={especies} varMap={varMap} onSave={handleSave} onClose={()=>setModal(null)} />}
+      {modal?.mode === "edit" && <ModalForm item={modal.item} campañas={campañas} especies={especies} varMap={varMap} onSave={handleSave} onClose={()=>setModal(null)} />}
+      {modal?.mode === "move" && <MoveModal item={modal.item} onSave={handleMove} onClose={()=>setModal(null)} />}
+      
+      {/* FIRMA DE AUTORÍA INTEGRADA */}
+      <footer style={{position:"fixed", bottom:10, right:20, fontSize:"0.75rem", color:"#9ca3af"}} className="no-print">
+        Creado por Ignacio Diaz
+      </footer>
+    </div>
+  );
+}
+
+// FORMULARIO MODAL INTERACTIVO REUTILIZABLE
+function ModalForm({ item, campañas, especies, varMap, onSave, onClose }) {
+  const [campaña, setCampaña] = useState(item?.Campaña || campañas[0] || "24/25");
+  const [especie, setEspecie] = useState(item?.Especie || especies[0] || "SOJA");
+  const [variedad, setVariedad] = useState(item?.Variedad || "Variedad A");
+  const [categoría, setCategoría] = useState(item?.Categoría || "Original");
+  const [depósito, setDepósito] = useState(item?.Depósito || "Planta 1");
+  const [bolsas, setBolsas] = useState(item?.Bolsas || 0);
+  const [kilosBolsa, setKilosBolsa] = useState(item?.Kilos_por_Bolsa || 40);
+  const [estado, setEstado] = useState(item?.Estado || "DISPONIBLE");
+  const [notas, setNotas] = useState(item?.Notas || "");
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSave({ id: item?.ID || null, campaña, especie, variedad, categoría, depósito, bolsas, kilosBolsa, estado, notas });
+  };
+
+  return (
+    <div className="overlay">
+      <form className="modal" onSubmit={handleSubmit}>
+        <h2>{item ? `Editar Lote ID #${item.ID}` : "Cargar Nuevo Lote"}</h2>
+        <div className="form-grid">
+          <div className="field"><label>Campaña</label>
+            <select value={campaña} onChange={e=>setCampaña(e.target.value)}>
+              {campañas.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className="field"><label>Especie</label>
+            <select value={especie} onChange={e=>setEspecie(e.target.value)}>
+              {especies.map(e => <option key={e} value={e}>{e}</option>)}
+            </select>
+          </div>
+          <div className="field full"><label>Variedad</label>
+            <input type="text" value={variedad} onChange={e=>setVariedad(e.target.value)} required />
+          </div>
+          <div className="field"><label>Depósito / Ubicación</label>
+            <input type="text" value={depósito} onChange={e=>setDepósito(e.target.value)} required />
+          </div>
+          <div className="field"><label>Categoría</label>
+            <input type="text" value={categoría} onChange={e=>setCategoría(e.target.value)} />
+          </div>
+          <div className="field"><label>Cantidad Bolsas</label>
+            <input type="number" value={bolsas} onChange={e=>setBolsas(e.target.value)} required />
+          </div>
+          <div className="field"><label>Kilos por Bolsa</label>
+            <input type="number" value={kilosBolsa} onChange={e=>setKilosBolsa(e.target.value)} required />
+          </div>
+          <div className="field full"><label>Notas / Observaciones</label>
+            <textarea value={notas} onChange={e=>setNotas(e.target.value)} />
+          </div>
+        </div>
+        <div className="modal-btns">
+          <button type="button" className="btn-cancel" onClick={onClose}>Cancelar</button>
+          <button type="submit" className="btn-save">💾 Guardar Lote</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// MODAL PARA MOVIMIENTOS Y ÓRDENES DE CARGA (LOGÍSTICA)
+function MoveModal({ item, onSave, onClose }) {
+  const [tipo, setTipo] = useState("transfer");
+  const [cantidad, setCantidad] = useState(1);
+  const [destino, setDestino] = useState("");
+  const [cliente, setCliente] = useState("");
+  const [chasis, setChasis] = useState("");
+  const [acoplado, setAcoplado] = useState("");
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSave({ loteId: item.ID, tipo, cantidad, destino, cliente, chasis, acoplado });
+  };
+
+  return (
+    <div className="overlay">
+      <form className="modal modal-md" onSubmit={handleSubmit}>
+        <h2>Registrar Movimiento de Stock</h2>
+        <div className="move-info">
+          <b>Lote seleccionado:</b> {item.Variedad} ({item.Depósito})<br/>
+          <b>Disponibilidad actual:</b> {item.Bolsas} bolsas
+        </div>
+        <div className="move-row">
+          <label>Tipo de Operación</label>
+          <select value={tipo} onChange={e=>setTipo(e.target.value)}>
+            <option value="transfer">Traspaso Interno entre Depósitos</option>
+            <option value="egreso">Egreso / Despacho Comercial (Genera OC)</option>
+          </select>
+        </div>
+        <div className="move-row">
+          <label>Cantidad de Bolsas a Mover</label>
+          <input type="number" min="1" max={item.Bolsas} value={cantidad} onChange={e=>setCantidad(e.target.value)} required />
+        </div>
+        {tipo === "transfer" ? (
+          <div className="move-row">
+            <label>Depósito Destino</label>
+            <input type="text" placeholder="Ej: Planta 2, Celda B" value={destino} onChange={e=>setDestino(e.target.value)} required />
+          </div>
+        ) : (
+          <>
+            <div className="move-row"><label>Cliente / Destinatario</label><input type="text" value={cliente} onChange={e=>setCliente(e.target.value)} required /></div>
+            <div className="move-row"><label>Patente Chasis</label><input type="text" value={chasis} onChange={e=>setChasis(e.target.value)} required /></div>
+            <div className="move-row"><label>Patente Acoplado</label><input type="text" value={acoplado} onChange={e=>setAcoplado(e.target.value)} /></div>
+          </>
+        )}
+        <div className="modal-btns">
+          <button type="button" className="btn-cancel" onClick={onClose}>Cancelar</button>
+          <button type="submit" className="btn-desp">✓ Confirmar y Aplicar</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+</script>
+</body>
+</html>
+""" % (js_stock, js_historial, js_ordenes, js_catalogos)
+
+# Despliegue limpio del HTML dentro de Streamlit ocupando la pantalla completa
+st.components.v1.html(html_content, height=1200, scrolling=True)
