@@ -1,101 +1,177 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>La Clementina · Stock Semillas</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500&display=swap');
-:root{
-  --bg:#f4f6f9;--panel:#fff;--card:#fff;--border:#dde1ea;
-  --accent:#e07b00;--blue:#1a7abf;--green:#2e8b57;--red:#c0392b;
-  --purple:#7b4fa6;--text:#1a1e2e;--muted:#6b7280;--shadow:0 1px 4px rgba(0,0,0,.08);
-  --fh:'Barlow Condensed',sans-serif;--fb:'Barlow',sans-serif;
-}
-*{box-sizing:border-box;margin:0;padding:0}
-html,body{background:var(--bg);color:var(--text);font-family:var(--fb)}
-.app{max-width:1300px;margin:0 auto;padding-bottom:60px}
+import streamlit as st
+from streamlit_gsheets import GSheetsConnection
+import pandas as pd
+import json
+from datetime import datetime
+import streamlit.components.v1 as components
 
-/* LOGIN */
-.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a2a4a,#1e3660)}
-.login-box{background:#fff;border-radius:16px;padding:40px 48px;width:100%;max-width:400px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.25)}
-.login-box h1{font-family:var(--fh);font-size:1.5rem;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#1a2a4a;margin-bottom:6px}
-.login-box p{font-size:.85rem;color:var(--muted);margin-bottom:24px}
-.login-btn{width:100%;background:var(--accent);border:none;border-radius:8px;color:#fff;font-family:var(--fh);font-size:1rem;font-weight:800;text-transform:uppercase;letter-spacing:.8px;padding:12px;cursor:pointer;margin-top:8px;transition:background .15s}
-.login-btn:hover{background:#c86e00}
+# ==============================================================================
+# 1. CONFIGURACIÓN DEL PANEL DE STREAMLIT
+# ==============================================================================
+st.set_page_config(
+    page_title="La Clementina · Stock Semillas",
+    page_icon="🌱",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
-/* HEADER */
-.hdr{background:linear-gradient(135deg,#1a2a4a 60%,#1e3660);border-bottom:3px solid var(--accent);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.hdr-left{display:flex;align-items:center;gap:14px}
-.hdr h1{font-family:var(--fh);font-size:1.6rem;font-weight:800;text-transform:uppercase;letter-spacing:1px;line-height:1;color:#fff}
-.hdr h1 span{color:#f5a623}
-.hdr-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
-.creator-tag{font-size:.65rem;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.5px}
-.hdr-tabs{display:flex;gap:5px;flex-wrap:wrap}
-.tab{font-family:var(--fh);font-size:.82rem;font-weight:700;letter-spacing:.6px;text-transform:uppercase;padding:6px 13px;border-radius:6px;cursor:pointer;border:1.5px solid rgba(255,255,255,.22);background:transparent;color:rgba(255,255,255,.65);transition:all .18s}
-.tab.active{background:#f5a623;border-color:#f5a623;color:#1a1e2e}
-.tab:hover:not(.active){border-color:rgba(255,255,255,.7);color:#fff}
+st.markdown("""
+    <style>
+        .block-container { padding: 0rem !important; max-width: 100% !important; }
+        [data-testid="stHeader"] { display: none !important; }
+        footer { visibility: hidden !important; }
+        iframe { display: block; border: none; width: 100vw; height: 100vh; }
+    </style>
+""", unsafe_allow_html=True)
 
-/* KPI, TOOLBAR, TABLE, ETC - (Mismos estilos que el original) */
-.kpi-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:var(--border);border-bottom:1px solid var(--border)}
-.kpi{background:var(--panel);padding:12px 16px}
-.kpi-val{font-family:var(--fh);font-size:1.8rem;font-weight:800;line-height:1}
-.kpi-lbl{font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-top:2px}
-.c-or{color:var(--accent)}.c-bl{color:var(--blue)}.c-gr{color:var(--green)}.c-pu{color:var(--purple)}
-.toolbar{display:flex;gap:8px;padding:12px 16px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--border);background:var(--panel);box-shadow:var(--shadow)}
-.btn{font-family:var(--fh);font-size:.85rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:7px 14px;border-radius:8px;cursor:pointer;border:none;transition:all .15s;display:inline-flex;align-items:center;gap:5px}
-.btn-add{background:var(--accent);color:#fff}
-.table-wrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-size:.82rem}
-th{font-family:var(--fh);font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);padding:8px 10px;text-align:left}
-tbody tr{border-bottom:1px solid #edf0f5;background:#fff}
-td{padding:8px 10px}
-.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:20px;font-size:.7rem;font-weight:700;font-family:var(--fh);text-transform:uppercase}
-</style>
-</head>
-<body>
-<div id="root"></div>
+# ==============================================================================
+# 2. CONEXIÓN GENERAL CON GOOGLE SHEETS
+# ==============================================================================
+try:
+    conn = st.connection("gsheets", type=GSheetsConnection)
+except Exception as e:
+    st.error("⚠️ Error al conectar con Google Sheets.")
+    st.stop()
 
-<script type="text/babel">
-const {useState} = React;
+def leer_pestana(sheet_name):
+    try:
+        df = conn.read(worksheet=sheet_name, ttl=0)
+        return df.fillna("").to_dict(orient="records")
+    except Exception:
+        return []
 
-function App() {
-  const [user, setUser] = useState(false);
+def actualizar_pestana(sheet_name, lista_datos):
+    if lista_datos:
+        df_nuevo = pd.DataFrame(lista_datos)
+        conn.update(worksheet=sheet_name, data=df_nuevo)
 
-  if (!user) return (
-    <div className="login-wrap">
-      <div className="login-box">
-        <h1>La Clementina</h1>
-        <p>Control de Stock</p>
-        <button className="login-btn" onClick={() => setUser(true)}>Ingresar</button>
-      </div>
-    </div>
-  );
+# ==============================================================================
+# 3. PROCESAMIENTO DE ACCIONES
+# ==============================================================================
+query_params = st.query_params
+
+if "action" in query_params:
+    action = query_params["action"]
+    payload = json.loads(query_params.get("payload", "{}"))
+    now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+    
+    if action == "save_lote":
+        stock = leer_pestana("Stock")
+        historial = leer_pestana("Historial")
+        lote_data = payload.get("item", payload)
+        
+        if lote_data.get("ID") or lote_data.get("id"):
+            lote_id = lote_data.get("ID") or lote_data.get("id")
+            stock = [r if str(r.get("ID")) != str(lote_id) else {
+                "ID": int(lote_id), 
+                "Campaña": lote_data.get("campaña", r.get("Campaña")), 
+                "Especie": lote_data.get("especie", r.get("Especie")),
+                "Variedad": lote_data.get("variedad", r.get("Variedad")), 
+                "Categoría": lote_data.get("categoría", r.get("Categoría")), 
+                "Depósito": lote_data.get("depósito", r.get("Depósito")),
+                "Bolsas": int(lote_data.get("bolsas", 0)), 
+                "Kilos_por_Bolsa": float(lote_data.get("kilosBolsa", r.get("Kilos_por_Bolsa", 40))),
+                "Kilos_Totales": int(lote_data.get("bolsas", 0)) * float(lote_data.get("kilosBolsa", r.get("Kilos_por_Bolsa", 40))),
+                "Estado": lote_data.get("estado", r.get("Estado", "DISPONIBLE")), 
+                "Notas": lote_data.get("notas", r.get("Notas"))
+            } for r in stock]
+            
+            historial.append({"Fecha": now_str, "Tipo": "EDICION", "Detalle": f"Se modificaron datos del lote ID {lote_id}", "Bolsas": int(lote_data.get("bolsas", 0)), "Kilos": int(lote_data.get("bolsas", 0)) * 40, "Operario": "Ignacio Diaz"})
+        else:
+            next_id = max([int(r.get("ID", 0)) for r in stock]) + 1 if stock else 1
+            kilos_t = int(lote_data.get("bolsas", 0)) * 40
+            stock.append({"ID": next_id, "Campaña": lote_data.get("campaña"), "Especie": lote_data.get("especie"), "Variedad": lote_data.get("variedad"), "Categoría": lote_data.get("categoría"), "Depósito": lote_data.get("depósito"), "Bolsas": int(lote_data.get("bolsas", 0)), "Kilos_por_Bolsa": 40, "Kilos_Totales": kilos_t, "Estado": "DISPONIBLE", "Notas": lote_data.get("notas")})
+            historial.append({"Fecha": now_str, "Tipo": "INGRESO", "Detalle": f"Alta lote ID {next_id}", "Bolsas": int(lote_data.get("bolsas", 0)), "Kilos": kilos_t, "Operario": "Ignacio Diaz"})
+            
+        actualizar_pestana("Stock", stock)
+        actualizar_pestana("Historial", historial)
+        st.query_params.clear()
+        st.rerun()
+
+    elif action == "move_lote":
+        stock = leer_pestana("Stock")
+        historial = leer_pestana("Historial")
+        ordenes = leer_pestana("Ordenes")
+        mov = payload
+        lote_id = int(mov.get("loteId"))
+        cant = int(mov.get("cantidad"))
+        
+        for lote in stock:
+            if int(lote.get("ID", 0)) == lote_id:
+                lote["Bolsas"] = int(lote["Bolsas"]) - cant
+                lote["Kilos_Totales"] = lote["Bolsas"] * 40
+                kg_movidos = cant * 40
+                
+                if mov.get("tipo") == "transfer":
+                    next_id_t = max([int(r.get("ID", 0)) for r in stock]) + 1
+                    lote_dest = lote.copy()
+                    lote_dest["ID"] = next_id_t
+                    lote_dest["Depósito"] = mov.get("destino")
+                    lote_dest["Bolsas"] = cant
+                    lote_dest["Kilos_Totales"] = kg_movidos
+                    lote_dest["Notas"] = f"Traspasado desde {lote['Depósito']}"
+                    stock.append(lote_dest)
+                    historial.append({"Fecha": now_str, "Tipo": "TRANSFERENCIA", "Detalle": f"Traspaso: {lote['Depósito']} -> {mov.get('destino')}", "Bolsas": cant, "Kilos": kg_movidos, "Operario": "Ignacio Diaz"})
+                else:
+                    proxima_oc = max([int(o.get("ID_Orden", 0)) for o in ordenes]) + 1 if ordenes else 5001
+                    ordenes.append({"ID_Orden": proxima_oc, "Fecha": now_str, "Campaña": lote["Campaña"], "Especie": lote["Especie"], "Variedad": lote["Variedad"], "Depósito": lote["Depósito"], "Bolsas": cant, "Kilos": kg_movidos, "Cliente": mov.get("cliente", "").upper(), "Patente_Chasis": mov.get("chasis", "").upper(), "Estado": "DESPACHADO"})
+                    historial.append({"Fecha": now_str, "Tipo": "EGRESO", "Detalle": f"Despacho OC #{proxima_oc}: {mov.get('cliente', '').upper()}", "Bolsas": cant, "Kilos": kg_movidos, "Operario": "Ignacio Diaz"})
+                break
+                
+        actualizar_pestana("Stock", stock)
+        actualizar_pestana("Historial", historial)
+        if mov.get("tipo") == "egreso": actualizar_pestana("Ordenes", ordenes)
+        st.query_params.clear()
+        st.rerun()
+
+# ==============================================================================
+# 4. FRONTEND (HTML + REACT)
+# ==============================================================================
+# (El código JS sigue igual hasta el MoveModal)
+html_content = """
+... [INSERTAR AQUÍ TODO TU CÓDIGO HTML/JS ANTERIOR] ...
+"""
+# COMPLETANDO LA FUNCIÓN MoveModal QUE FALTABA
+"""
+function MoveModal({ item, onSave, onClose }) {
+  const [tipo, setTipo] = useState("transfer");
+  const [cantidad, setCantidad] = useState(1);
+  const [destino, setDestino] = useState("");
+  const [cliente, setCliente] = useState("");
+  const [chasis, setChasis] = useState("");
 
   return (
-    <div className="app">
-      <header className="hdr">
-        <div className="hdr-left">
-          <h1>La Clementina <span>Stock</span></h1>
+    <div className="overlay">
+      <form className="modal" onSubmit={e => { e.preventDefault(); onSave({ loteId: item.ID, tipo, cantidad, destino, cliente, chasis }); onClose(); }}>
+        <h2>Movimiento: {item.Variedad}</h2>
+        <div className="move-info">Stock actual: {item.Bolsas} bolsas</div>
+        <div className="form-grid">
+          <div className="field full">
+            <label>Tipo de Movimiento</label>
+            <select value={tipo} onChange={e => setTipo(e.target.value)}>
+              <option value="transfer">Transferencia entre depósitos</option>
+              <option value="egreso">Egreso Comercial (Despacho)</option>
+            </select>
+          </div>
+          <div className="field full"><label>Cantidad (Bolsas)</label><input type="number" min="1" max={item.Bolsas} value={cantidad} onChange={e => setCantidad(e.target.value)} required/></div>
+          {tipo === "transfer" && <div className="field full"><label>Depósito Destino</label><input type="text" value={destino} onChange={e => setDestino(e.target.value)} required/></div>}
+          {tipo === "egreso" && (
+            <>
+              <div className="field full"><label>Cliente</label><input type="text" value={cliente} onChange={e => setCliente(e.target.value)} required/></div>
+              <div className="field"><label>Chasis</label><input type="text" value={chasis} onChange={e => setChasis(e.target.value)}/></div>
+            </>
+          )}
         </div>
-        <div className="hdr-right">
-          <div className="creator-tag">Creado por Ignacio Diaz</div>
+        <div className="modal-btns">
+          <button type="button" className="btn-cancel" onClick={onClose}>Cancelar</button>
+          <button type="submit" className="btn-save">Confirmar</button>
         </div>
-      </header>
-      <div style={{padding: '20px'}}>
-        <h2>Panel de Control</h2>
-        <p>Sistema cargado correctamente.</p>
-        {/* Aquí iría el resto de tu lógica de componentes */}
-      </div>
+      </form>
     </div>
   );
 }
+// Cierra el resto del código y el script (No olvidar cerrar todo correctamente)
+"""
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<App />);
-</script>
-</body>
-</html>
+# IMPORTANTE: ESTA LÍNEA RENDERIZA EL FRONTEND
+components.html(html_content, height=1000)
