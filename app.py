@@ -1,16 +1,13 @@
-"""
 La Clementina · Sistema de Gestión de Stock de Semillas
-Versión Nube — Sincronizado con Google Sheets
-Desarrollado por Ignacio Diaz
+Versión Streamlit — Equivalente al HTML original
 """
 
 import streamlit as st
 import pandas as pd
 import json
 import io
-import gspread
 from datetime import datetime, date
-from google.oauth2.service_account import Credentials
+from pathlib import Path
 
 # ─── CONFIGURACIÓN ────────────────────────────────────────────
 st.set_page_config(
@@ -20,9 +17,10 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# ─── CONSTANTES POR DEFECTO (RESPALDO COLD-START) ─────────────
+# ─── CONSTANTES ───────────────────────────────────────────────
 LOW = 5
 DEFAULT_PASS = "semillas2025"
+DATA_FILE = "laclementina_data.json"
 
 CAMPAÑAS_DEF = ["2024/2025", "2025/2026"]
 ESPECIES_DEF = ["Soja", "Trigo", "Maíz", "Girasol", "Sorgo", "Cebada"]
@@ -133,198 +131,35 @@ div[data-testid="stMetric"] label { font-size: .65rem !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# ─── CREDENCIALES Y PERSISTENCIA NUBE (GOOGLE SHEETS) ──────────
-@st.cache_resource
-def conectar_google_sheets():
-    """Autentica con la cuenta de servicio usando los Secrets de Streamlit."""
-    scopes = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive"
-    ]
-    creds_dict = dict(st.secrets["gcp_service_account"])
-    creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-    creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
-    return gspread.authorize(creds)
-
+# ─── PERSISTENCIA ─────────────────────────────────────────────
 def load_data():
-    """Descarga de manera unificada las 4 pestañas de Google Sheets."""
-    try:
-        client = conectar_google_sheets()
-        spreadsheet_url = "https://docs.google.com/spreadsheets/d/1QnyD0ypbwgbMD4PYAQoijkWeAiK47KAh1sAPuc9gspA/edit"
-        spreadsheet = client.open_by_url(spreadsheet_url)
-        
-        # 1. Leer Stock
-        ws_stock = spreadsheet.worksheet("Stock")
-        records_stock = ws_stock.get_all_records()
-        stock_list = []
-        for r in records_stock:
-            if not r.get("id"): continue
-            stock_list.append({
-                "id": int(r["id"]),
-                "campaña": str(r.get("campaña", "")),
-                "especie": str(r.get("especie", "")),
-                "variedad": str(r.get("variedad", "")),
-                "tipo": str(r.get("tipo", "bigbag")).lower(),
-                "tratada": str(r.get("tratada", "")).upper() in ["TRUE", "SÍ", "SI", "1"],
-                "cantidad": int(r["cantidad"]) if r.get("cantidad") != "" else 0,
-                "pesoUnit": int(r["pesoUnit"]) if r.get("pesoUnit") != "" else 0,
-                "lote": str(r.get("lote", "")),
-                "ubicacion": str(r.get("ubicacion", "")),
-                "fecha": str(r.get("fecha", "")),
-                "pg": int(r["pg"]) if r.get("pg") not in ["", None] else "",
-                "pmil": int(r["pmil"]) if r.get("pmil") not in ["", None] else "",
-                "obs": str(r.get("obs", ""))
-            })
-        if not stock_list and not records_stock:
-            stock_list = STOCK_INIT.copy()
-
-        # 2. Leer Historial
-        ws_hist = spreadsheet.worksheet("Historial")
-        records_hist = ws_hist.get_all_records()
-        hist_list = []
-        for r in records_hist:
-            hist_list.append({
-                "fecha": str(r.get("fecha", "")),
-                "campaña": str(r.get("campaña", "")),
-                "especie": str(r.get("especie", "")),
-                "variedad": str(r.get("variedad", "")),
-                "tipo": str(r.get("tipo", "")).lower(),
-                "lote": str(r.get("lote", "")),
-                "remito": str(r.get("remito", "")),
-                "nPedido": str(r.get("nPedido", "")),
-                "op": str(r.get("op", "")).lower(),
-                "delta": int(r["delta"]) if r.get("delta") != "" else 0,
-                "kgMovidos": int(r["kgMovidos"]) if r.get("kgMovidos") != "" else 0,
-                "stockPrev": int(r["stockPrev"]) if r.get("stockPrev") != "" else 0,
-                "stockPost": int(r["stockPost"]) if r.get("stockPost") != "" else 0,
-                "motivo": str(r.get("motivo", ""))
-            })
-
-        # 3. Leer Ordenes
-        ws_ord = spreadsheet.worksheet("Ordenes")
-        records_ord = ws_ord.get_all_records()
-        ord_list = []
-        for r in records_ord:
-            if not r.get("id"): continue
-            try:
-                lotes_data = json.loads(r.get("lotes", "[]"))
-            except:
-                lotes_data = []
-            ord_list.append({
-                "id": int(r["id"]),
-                "numero": str(r.get("numero", "")),
-                "remito": str(r.get("remito", "")),
-                "nPedido": str(r.get("nPedido", "")),
-                "fecha": str(r.get("fecha", "")),
-                "campaña": str(r.get("campaña", "")),
-                "especie": str(r.get("especie", "")),
-                "variedad": str(r.get("variedad", "")),
-                "tipo": str(r.get("tipo", "")).lower(),
-                "tratada": str(r.get("tratada", "")).upper() in ["TRUE", "SÍ", "SI", "1"],
-                "pesoUnit": int(r["pesoUnit"]) if r.get("pesoUnit") != "" else 0,
-                "pg": str(r.get("pg", "")),
-                "pmil": str(r.get("pmil", "")),
-                "destino": str(r.get("destino", "")),
-                "obs": str(r.get("obs", "")),
-                "estado": str(r.get("estado", "pendiente")).lower(),
-                "fechaDespachada": str(r.get("fechaDespachada", "")),
-                "lotes": lotes_data
-            })
-
-        # 4. Leer Catalogos
-        ws_cat = spreadsheet.worksheet("Catalogos")
-        records_cat = ws_cat.get_all_records()
-        cat_dict = {row["Llave"]: row["Valor"] for row in records_cat if "Llave" in row and "Valor" in row}
-        
-        campañas = json.loads(cat_dict.get("campañas", json.dumps(CAMPAÑAS_DEF)))
-        especies = json.loads(cat_dict.get("especies", json.dumps(ESPECIES_DEF)))
-        varMap = json.loads(cat_dict.get("varMap", json.dumps(VARS_DEF)))
-        password = cat_dict.get("password", DEFAULT_PASS)
-
-        return {
-            "stock": stock_list,
-            "historial": hist_list,
-            "ordenes": ord_list,
-            "campañas": campañas,
-            "especies": especies,
-            "varMap": varMap,
-            "password": password
-        }
-    except Exception as e:
-        st.error(f"⚠️ Error al conectar con Google Sheets: {e}. Cargando entorno de respaldo local.")
-        return {
-            "stock": STOCK_INIT.copy(),
-            "historial": [],
-            "ordenes": [],
-            "campañas": CAMPAÑAS_DEF.copy(),
-            "especies": ESPECIES_DEF.copy(),
-            "varMap": {k: list(v) for k, v in VARS_DEF.items()},
-            "password": DEFAULT_PASS,
-        }
+    p = Path(DATA_FILE)
+    if p.exists():
+        try:
+            return json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {
+        "stock": STOCK_INIT.copy(),
+        "historial": [],
+        "ordenes": [],
+        "campañas": CAMPAÑAS_DEF.copy(),
+        "especies": ESPECIES_DEF.copy(),
+        "varMap": {k: list(v) for k, v in VARS_DEF.items()},
+        "password": DEFAULT_PASS,
+    }
 
 def save_data():
-    """Sobreescribe de forma segura y estructurada las tablas en Google Sheets."""
-    try:
-        client = conectar_google_sheets()
-        spreadsheet_url = "https://docs.google.com/spreadsheets/d/1QnyD0ypbwgbMD4PYAQoijkWeAiK47KAh1sAPuc9gspA/edit"
-        spreadsheet = client.open_by_url(spreadsheet_url)
-        
-        # Guardar Stock
-        ws_stock = spreadsheet.worksheet("Stock")
-        ws_stock.clear()
-        headers_stock = ["id", "campaña", "especie", "variedad", "tipo", "tratada", "cantidad", "pesoUnit", "lote", "ubicacion", "fecha", "pg", "pmil", "obs"]
-        rows_stock = [headers_stock]
-        for i in st.session_state.stock:
-            rows_stock.append([
-                i.get("id"), i.get("campaña"), i.get("especie"), i.get("variedad"), i.get("tipo"),
-                "TRUE" if i.get("tratada") else "FALSE", i.get("cantidad"), i.get("pesoUnit"),
-                i.get("lote"), i.get("ubicacion"), i.get("fecha"), i.get("pg"), i.get("pmil"), i.get("obs")
-            ])
-        ws_stock.update("A1", rows_stock)
-        
-        # Guardar Historial
-        ws_hist = spreadsheet.worksheet("Historial")
-        ws_hist.clear()
-        headers_hist = ["fecha", "campaña", "especie", "variedad", "tipo", "lote", "remito", "nPedido", "op", "delta", "kgMovidos", "stockPrev", "stockPost", "motivo"]
-        rows_hist = [headers_hist]
-        for h in st.session_state.historial:
-            rows_hist.append([
-                h.get("fecha"), h.get("campaña"), h.get("especie"), h.get("variedad"), h.get("tipo"),
-                h.get("lote"), h.get("remito"), h.get("nPedido"), h.get("op"), h.get("delta"),
-                h.get("kgMovidos"), h.get("stockPrev"), h.get("stockPost"), h.get("motivo")
-            ])
-        ws_hist.update("A1", rows_hist)
-        
-        # Guardar Ordenes
-        ws_ord = spreadsheet.worksheet("Ordenes")
-        ws_ord.clear()
-        headers_ord = ["id", "numero", "remito", "nPedido", "fecha", "campaña", "especie", "variedad", "tipo", "tratada", "pesoUnit", "pg", "pmil", "destino", "obs", "estado", "fechaDespachada", "lotes"]
-        rows_ord = [headers_ord]
-        for o in st.session_state.ordenes:
-            rows_ord.append([
-                o.get("id"), o.get("numero"), o.get("remito"), o.get("nPedido"), o.get("fecha"),
-                o.get("campaña"), o.get("especie"), o.get("variedad"), o.get("tipo"),
-                "TRUE" if o.get("tratada") else "FALSE", o.get("pesoUnit"), o.get("pg"), o.get("pmil"),
-                o.get("destino"), o.get("obs"), o.get("estado"), o.get("fechaDespachada"),
-                json.dumps(o.get("lotes", []))
-            ])
-        ws_ord.update("A1", rows_ord)
-        
-        # Guardar Catalogos
-        ws_cat = spreadsheet.worksheet("Catalogos")
-        ws_cat.clear()
-        headers_cat = ["Llave", "Valor"]
-        rows_cat = [
-            headers_cat,
-            ["campañas", json.dumps(st.session_state.campañas)],
-            ["especies", json.dumps(st.session_state.especies)],
-            ["varMap", json.dumps(st.session_state.varMap)],
-            ["password", st.session_state.password]
-        ]
-        ws_cat.update("A1", rows_cat)
-        
-    except Exception as e:
-        st.error(f"❌ No se pudieron guardar los cambios en la nube: {e}")
+    d = {
+        "stock":    st.session_state.stock,
+        "historial":st.session_state.historial,
+        "ordenes":  st.session_state.ordenes,
+        "campañas": st.session_state.campañas,
+        "especies": st.session_state.especies,
+        "varMap":   st.session_state.varMap,
+        "password": st.session_state.password,
+    }
+    Path(DATA_FILE).write_text(json.dumps(d, ensure_ascii=False, indent=2), encoding="utf-8")
 
 def init_state():
     if "initialized" not in st.session_state:
@@ -337,6 +172,7 @@ def init_state():
         st.session_state.varMap    = d.get("varMap",    {k: list(v) for k, v in VARS_DEF.items()})
         st.session_state.password  = d.get("password",  DEFAULT_PASS)
         st.session_state.logged_in = False
+        st.session_state.tab       = "resumen"
         st.session_state.modal     = None
         st.session_state.edit_item = None
         st.session_state.edit_oc   = None
@@ -423,7 +259,7 @@ c1.metric("🏗 BigBags",      fmt(total_bb))
 c2.metric("🎒 Bolsas",       fmt(total_bo))
 c3.metric("⚖ Toneladas",    f"{total_kg/1000:.1f} t")
 c4.metric("🌱 Variedades",   total_vars)
-c5.metric("⚠ Stock bajo",    low_count)
+c5.metric("⚠ Stock bajo",   low_count)
 c6.metric("📋 OC Pendientes", oc_pend)
 
 # ─── TABS ─────────────────────────────────────────────────────
@@ -440,18 +276,23 @@ with tabs[0]:
     with col_f2:
         r_esp = st.selectbox("Especie", ["Todas"] + st.session_state.especies, key="r_esp")
 
+    # Agrupar
     resumen = {}
     for i in stock:
         camp = i.get("campaña", "")
         esp  = i.get("especie", "")
-        if r_camp != "Todas" and camp != r_camp: continue
-        if r_esp != "Todas" and esp != r_esp: continue
+        if r_camp != "Todas" and camp != r_camp:
+            continue
+        if r_esp != "Todas" and esp != r_esp:
+            continue
         key = f"{i.get('variedad')}|||{i.get('tipo')}|||{i.get('tratada')}"
-        if camp not in resumen: resumen[camp] = {}
-        if esp not in resumen[camp]: resumen[camp][esp] = {}
+        if camp not in resumen:
+            resumen[camp] = {}
+        if esp not in resumen[camp]:
+            resumen[camp][esp] = {}
         if key not in resumen[camp][esp]:
             resumen[camp][esp][key] = {"variedad": i.get("variedad"), "tipo": i.get("tipo"),
-                                       "tratada": i.get("tratada"), "_uds": 0, "_kgs": 0}
+                                        "tratada": i.get("tratada"), "_uds": 0, "_kgs": 0}
         resumen[camp][esp][key]["_uds"] += i.get("cantidad", 0)
         resumen[camp][esp][key]["_kgs"] += kg_total(i)
 
@@ -497,6 +338,7 @@ with tabs[0]:
 # TAB 2 — TABLA
 # ══════════════════════════════════════════════════════════════
 with tabs[1]:
+    # Filtros
     tf1, tf2, tf3, tf4, tf5, tf6 = st.columns([3, 2, 2, 2, 2, 1])
     with tf1:
         search = st.text_input("🔍 Buscar", placeholder="Variedad, lote, especie…", label_visibility="collapsed", key="t_search")
@@ -512,7 +354,9 @@ with tabs[1]:
         if st.button("＋ Nuevo", type="primary", use_container_width=True):
             st.session_state.modal = "new"
             st.session_state.edit_item = None
+            st.rerun()
 
+    # Filtrar
     filtered = []
     for i in stock:
         if f_camp != "Todas" and i.get("campaña") != f_camp: continue
@@ -526,16 +370,22 @@ with tabs[1]:
             if search.lower() not in hay: continue
         filtered.append(i)
 
-    bc1, _ = st.columns([2, 10])
+    # Botones CSV / Imprimir
+    bc1, bc2, _ = st.columns([2, 2, 8])
     with bc1:
         rows = [["Campaña","Especie","Variedad","Tipo","Tratada","Cantidad","Kg Totales","PG (%)","PMIL (g)","Lote","Ubicación","Fecha","Observaciones"]]
         for i in filtered:
             rows.append([i.get("campaña",""), i.get("especie",""), i.get("variedad",""),
-                         "BigBag" if i.get("tipo")=="bigbag" else "Bolsa", "Sí" if i.get("tratada") else "No",
-                         i.get("cantidad",""), kg_total(i), i.get("pg",""), i.get("pmil",""),
-                         i.get("lote",""), i.get("ubicacion",""), i.get("fecha",""), i.get("obs","")])
-        st.download_button("⬇ Excel/CSV", data=to_csv(rows), file_name=f"stock_{date.today()}.csv", mime="text/csv")
+                         "BigBag" if i.get("tipo")=="bigbag" else "Bolsa",
+                         "Sí" if i.get("tratada") else "No",
+                         i.get("cantidad",""), kg_total(i),
+                         i.get("pg",""), i.get("pmil",""),
+                         i.get("lote",""), i.get("ubicacion",""),
+                         i.get("fecha",""), i.get("obs","")])
+        st.download_button("⬇ Excel/CSV", data=to_csv(rows),
+                           file_name=f"stock_{date.today()}.csv", mime="text/csv")
 
+    # Tabla
     if not filtered:
         st.info("Sin registros para los filtros seleccionados.")
     else:
@@ -561,17 +411,28 @@ with tabs[1]:
                 "_low":      low,
             })
         df = pd.DataFrame(rows_df)
+
         display_df = df[df_cols]
-        st.dataframe(display_df, use_container_width=True, hide_index=True, height=min(40 + 35 * len(display_df), 550))
+        st.dataframe(
+            display_df,
+            use_container_width=True,
+            hide_index=True,
+            height=min(40 + 35 * len(display_df), 550),
+        )
 
+        # Total pie filtrado
         tot_kg_filt = sum(kg_total(i) for i in filtered)
-        st.caption(f"**{len(filtered)} registro{'s' if len(filtered)!=1 else ''}** &nbsp;·&nbsp; **{fmt(tot_kg_filt)} kg** totales filtrados")
+        st.caption(f"**{len(filtered)} registro{'s' if len(filtered)!=1 else ''}** &nbsp;·&nbsp; "
+                   f"**{fmt(tot_kg_filt)} kg** totales filtrados")
 
+        # Acciones por registro
         st.markdown("**Acciones por registro:**")
         sel_variedad = st.selectbox(
             "Seleccionar registro",
             options=[(i.get("id"), f"{i.get('variedad')} | {i.get('tipo')} | {i.get('campaña')} | Lote: {i.get('lote','—')} | {fmt(i.get('cantidad',0))} uds") for i in filtered],
-            format_func=lambda x: x[1], label_visibility="collapsed", key="sel_item_id"
+            format_func=lambda x: x[1],
+            label_visibility="collapsed",
+            key="sel_item_id"
         )
         if sel_variedad:
             sel_id = sel_variedad[0]
@@ -582,14 +443,17 @@ with tabs[1]:
                     if st.button("⇄ Mover / Orden", use_container_width=True):
                         st.session_state.modal = "move"
                         st.session_state.edit_item = sel_item
+                        st.rerun()
                 with ac2:
                     if st.button("✏ Editar", use_container_width=True):
                         st.session_state.modal = "edit"
                         st.session_state.edit_item = sel_item
+                        st.rerun()
                 with ac3:
                     if st.button("✕ Eliminar", use_container_width=True):
                         st.session_state.modal = "delete"
                         st.session_state.edit_item = sel_item
+                        st.rerun()
 
 # ══════════════════════════════════════════════════════════════
 # TAB 3 — HISTORIAL
@@ -609,15 +473,20 @@ with tabs[2]:
                       or (h_op == "Solo Ingresos"  and h.get("op") == "ingreso"))]
 
     if not hist_filt:
-        st.info("Sin movimientos para los filtros seleccionados." if historial else "Sin movimientos todavía. Usá ⇄ Mover en Tabla para registrar.")
+        st.info("Sin movimientos para los filtros seleccionados." if historial else
+                "Sin movimientos todavía. Usá ⇄ Mover en Tabla para registrar.")
     else:
+        # CSV
         h_rows = [["Fecha","Campaña","Especie","Variedad","Tipo","Lote","Remito","N° Pedido","Operación","Cantidad","Kg Movidos","Stock Anterior","Stock Nuevo","Motivo"]]
         for h in hist_filt:
             h_rows.append([h.get("fecha",""), h.get("campaña",""), h.get("especie",""), h.get("variedad",""),
-                            "BigBag" if h.get("tipo")=="bigbag" else "Bolsa", h.get("lote",""), h.get("remito",""), h.get("nPedido",""),
-                            "Egreso" if h.get("op")=="egreso" else "Ingreso", h.get("delta",""), h.get("kgMovidos",""),
+                            "BigBag" if h.get("tipo")=="bigbag" else "Bolsa",
+                            h.get("lote",""), h.get("remito",""), h.get("nPedido",""),
+                            "Egreso" if h.get("op")=="egreso" else "Ingreso",
+                            h.get("delta",""), h.get("kgMovidos",""),
                             h.get("stockPrev",""), h.get("stockPost",""), h.get("motivo","")])
-        st.download_button("⬇ Excel/CSV Historial", data=to_csv(h_rows), file_name=f"historial_{date.today()}.csv", mime="text/csv")
+        st.download_button("⬇ Excel/CSV Historial", data=to_csv(h_rows),
+                           file_name=f"historial_{date.today()}.csv", mime="text/csv")
 
         df_h = pd.DataFrame([{
             "Fecha":       h.get("fecha",""),
@@ -662,55 +531,67 @@ with tabs[3]:
         if oc_search:
             lotes_str = " ".join(l.get("lote","") for l in o.get("lotes",[]))
             hay = " ".join([o.get("numero",""), o.get("remito",""), o.get("nPedido",""),
-                            o.get("variedad",""), o.get("especie",""), lotes_str, o.get("destino",""), o.get("obs","")]).lower()
+                            o.get("variedad",""), o.get("especie",""), lotes_str,
+                            o.get("destino",""), o.get("obs","")]).lower()
             if oc_search.lower() not in hay: continue
         oc_filt.append(o)
 
     if not oc_filt:
-        st.info("Sin órdenes para los filtros seleccionados." if ordenes else "Sin órdenes todavía. Creá una desde Tabla → ⇄ Mover → Orden de Carga.")
+        st.info("Sin órdenes para los filtros seleccionados." if ordenes else
+                "Sin órdenes todavía. Creá una desde Tabla → ⇄ Mover → Orden de Carga.")
     else:
+        # CSV
         oc_rows = [["N° OC","Remito","N° Pedido","Fecha","Campaña","Especie","Variedad","Tipo","Tratada","Cantidad","Kg","PG (%)","PMIL (g)","Lotes","Ubicaciones","Destino","Observaciones","Estado","Fecha Despacho"]]
         for o in oc_filt:
             lotes_s = "; ".join(l.get("lote","") for l in o.get("lotes",[]))
             ubics_s = "; ".join(l.get("ubicacion","") for l in o.get("lotes",[]))
             tc = sum(l.get("cantidad",0) for l in o.get("lotes",[]))
-            oc_rows.append([o.get("numero",""), o.get("remito",""), o.get("nPedido",""), o.get("fecha",""), o.get("campaña",""), o.get("especie",""),
-                             o.get("variedad",""), "BigBag" if o.get("tipo")=="bigbag" else "Bolsa", "Sí" if o.get("tratada") else "No", tc, tc*o.get("pesoUnit",0),
-                             o.get("pg",""), o.get("pmil",""), lotes_s, ubics_s, o.get("destino",""), o.get("obs",""),
-                             "Pendiente" if o.get("estado")=="pendiente" else "Despachada", o.get("fechaDespachada","")])
-        st.download_button("⬇ Excel/CSV OCs", data=to_csv(oc_rows), file_name=f"ordenes_{date.today()}.csv", mime="text/csv")
+            oc_rows.append([o.get("numero",""), o.get("remito",""), o.get("nPedido",""),
+                             o.get("fecha",""), o.get("campaña",""), o.get("especie",""),
+                             o.get("variedad",""), "BigBag" if o.get("tipo")=="bigbag" else "Bolsa",
+                             "Sí" if o.get("tratada") else "No", tc, tc*o.get("pesoUnit",0),
+                             o.get("pg",""), o.get("pmil",""), lotes_s, ubics_s,
+                             o.get("destino",""), o.get("obs",""),
+                             "Pendiente" if o.get("estado")=="pendiente" else "Despachada",
+                             o.get("fechaDespachada","")])
+        st.download_button("⬇ Excel/CSV OCs", data=to_csv(oc_rows),
+                           file_name=f"ordenes_{date.today()}.csv", mime="text/csv")
 
         df_oc = pd.DataFrame([{
-            "N° OC":        o.get("numero",""),
-            "Remito":       o.get("remito","—"),
-            "N° Pedido":    o.get("nPedido","—"),
-            "Fecha":        o.get("fecha",""),
-            "Campaña":      o.get("campaña",""),
-            "Especie":      o.get("especie",""),
-            "Variedad":     o.get("variedad",""),
-            "Tipo":         "BigBag" if o.get("tipo")=="bigbag" else "Bolsa",
-            "Tratada":      "✅" if o.get("tratada") else "○",
-            "Cant.":        sum(l.get("cantidad",0) for l in o.get("lotes",[])),
-            "Kg":           f'{fmt(sum(l.get("cantidad",0) for l in o.get("lotes",[]))*o.get("pesoUnit",0))} kg',
-            "PG %":         f'{o.get("pg","")}%' if o.get("pg") else "—",
-            "Lotes":        ", ".join(l.get("lote","") for l in o.get("lotes",[])),
-            "Destino":      o.get("destino","—"),
-            "Obs.":         o.get("obs","—"),
-            "Estado":       "⏳ Pendiente" if o.get("estado")=="pendiente" else "✓ Despachada",
-            "F. Despacho":  o.get("fechaDespachada","—"),
+            "N° OC":       o.get("numero",""),
+            "Remito":      o.get("remito","—"),
+            "N° Pedido":   o.get("nPedido","—"),
+            "Fecha":       o.get("fecha",""),
+            "Campaña":     o.get("campaña",""),
+            "Especie":     o.get("especie",""),
+            "Variedad":    o.get("variedad",""),
+            "Tipo":        "BigBag" if o.get("tipo")=="bigbag" else "Bolsa",
+            "Tratada":     "✅" if o.get("tratada") else "○",
+            "Cant.":       sum(l.get("cantidad",0) for l in o.get("lotes",[])),
+            "Kg":          f'{fmt(sum(l.get("cantidad",0) for l in o.get("lotes",[]))*o.get("pesoUnit",0))} kg',
+            "PG %":        f'{o.get("pg","")}%' if o.get("pg") else "—",
+            "Lotes":       ", ".join(l.get("lote","") for l in o.get("lotes",[])),
+            "Destino":     o.get("destino","—"),
+            "Obs.":        o.get("obs","—"),
+            "Estado":      "⏳ Pendiente" if o.get("estado")=="pendiente" else "✓ Despachada",
+            "F. Despacho": o.get("fechaDespachada","—"),
         } for o in oc_filt])
         st.dataframe(df_oc, use_container_width=True, hide_index=True, height=min(40+35*len(df_oc), 500))
 
         pend_n = sum(1 for o in oc_filt if o.get("estado")=="pendiente")
         desp_n = len(oc_filt) - pend_n
-        kg_pend = sum(sum(l.get("cantidad",0) for l in o.get("lotes",[]))*o.get("pesoUnit",0) for o in oc_filt if o.get("estado")=="pendiente")
+        kg_pend = sum(sum(l.get("cantidad",0) for l in o.get("lotes",[]))*o.get("pesoUnit",0)
+                      for o in oc_filt if o.get("estado")=="pendiente")
         st.caption(f"Pendientes: **{pend_n}** &nbsp;·&nbsp; Despachadas: **{desp_n}** &nbsp;·&nbsp; Kg pendientes: **{fmt(kg_pend)} kg**")
 
+        # Acciones OC
         st.markdown("**Acciones por OC:**")
         sel_oc_opt = st.selectbox(
             "Seleccionar OC",
             options=[(o.get("id"), f"{o.get('numero')} | {o.get('variedad')} | {o.get('destino','—')} | {o.get('estado','—')}") for o in oc_filt],
-            format_func=lambda x: x[1], label_visibility="collapsed", key="sel_oc_id"
+            format_func=lambda x: x[1],
+            label_visibility="collapsed",
+            key="sel_oc_id"
         )
         if sel_oc_opt:
             oc_id = sel_oc_opt[0]
@@ -722,21 +603,25 @@ with tabs[3]:
                         if st.button("✏ Editar OC", use_container_width=True):
                             st.session_state.modal = "editOC"
                             st.session_state.edit_oc = sel_oc
+                            st.rerun()
                 with oa2:
                     if sel_oc.get("estado") == "pendiente":
                         if st.button("✓ Despachar", use_container_width=True, type="primary"):
                             st.session_state.modal = "despachar"
                             st.session_state.edit_oc = sel_oc
+                            st.rerun()
                 with oa3:
                     if st.button("✕ Eliminar OC", use_container_width=True):
                         st.session_state.modal = "deleteOC"
                         st.session_state.edit_oc = sel_oc
+                        st.rerun()
 
 # ══════════════════════════════════════════════════════════════
-# TAB 5 — CATÁLOGOS / ADMIN (COMPLETO)
+# TAB 5 — CATÁLOGOS / ADMIN
 # ══════════════════════════════════════════════════════════════
 with tabs[4]:
     st.markdown('<div class="section-title">⚙ Gestión de Catálogos</div>', unsafe_allow_html=True)
+
     col_adm1, col_adm2 = st.columns(2)
 
     with col_adm1:
@@ -756,9 +641,9 @@ with tabs[4]:
     with col_adm2:
         st.markdown("**🌱 Especies**")
         for e in st.session_state.especies:
-            ea, eb = st.columns([4, 1])
+            ea, cb = st.columns([4, 1])
             ea.write(e)
-            if eb.button("✕", key=f"del_esp_{e}"):
+            if cb.button("✕", key=f"del_esp_{e}"):
                 st.session_state.especies = [x for x in st.session_state.especies if x != e]
                 st.session_state.varMap.pop(e, None)
                 save_data(); st.rerun()
@@ -769,255 +654,263 @@ with tabs[4]:
                 st.session_state.varMap[new_e.strip()] = []
                 save_data(); st.rerun()
 
-        st.markdown("---")
-        st.markdown("**🧬 Variedades por Especie**")
-        cat_esp = st.selectbox("Seleccionar Especie para administrar Variedades", st.session_state.especies, key="cat_esp")
-        if cat_esp:
-            vars_list = st.session_state.varMap.get(cat_esp, [])
-            for v in vars_list:
-                va, vb = st.columns([4, 1])
-                va.write(v)
-                if vb.button("✕", key=f"del_var_{cat_esp}_{v}"):
-                    st.session_state.varMap[cat_esp] = [x for x in vars_list if x != v]
-                    save_data(); st.rerun()
-            new_v = st.text_input(f"Nueva variedad para {cat_esp}", key="new_var")
-            if st.button(f"+ Agregar variedad a {cat_esp}") and new_v.strip():
-                if new_v.strip() not in st.session_state.varMap[cat_esp]:
-                    st.session_state.varMap[cat_esp].append(new_v.strip())
-                    save_data(); st.rerun()
+    st.markdown("---")
+    st.markdown("**🌿 Variedades por Especie**")
+    sel_e = st.selectbox("Seleccionar Especie para ver/gestionar variedades", st.session_state.especies, key="sel_esp_cat")
+    if sel_e:
+        vars_list = st.session_state.varMap.get(sel_e, [])
+        for v in vars_list:
+            v_col1, v_col2 = st.columns([4, 1])
+            v_col1.write(v)
+            if v_col2.button("✕", key=f"del_var_{sel_e}_{v}"):
+                st.session_state.varMap[sel_e] = [x for x in vars_list if x != v]
+                save_data(); st.rerun()
+        new_v = st.text_input(f"Nueva variedad para {sel_e}", key="new_var_input", placeholder="Ej. Nidera 5009")
+        if st.button("+ Agregar variedad") and new_v.strip():
+            if new_v.strip() not in st.session_state.varMap[sel_e]:
+                st.session_state.varMap[sel_e].append(new_v.strip())
+                save_data(); st.rerun()
 
 # ══════════════════════════════════════════════════════════════
-# ─── LOGICA INTEGRAL DE MODALES DE ACCIÓN (AUTOMATIZADOS) ──────
+# MOTORES DE ACCIÓN / MODALES
 # ══════════════════════════════════════════════════════════════
 if st.session_state.modal:
     st.markdown("---")
-    st.markdown('<div class="section-title">🛠 Formulario de Operación en Curso</div>', unsafe_allow_html=True)
-    
-    m_type = st.session_state.modal
-    item = st.session_state.edit_item
-    oc = st.session_state.edit_oc
+    m = st.session_state.modal
 
-    # MODAL: NUEVO / EDITAR REGISTRO DE STOCK
-    if m_type in ["new", "edit"]:
-        st.subheader("＋ Alta de Lote Físico" if m_type == "new" else f"✏ Editar Lote (ID: {item['id']})")
-        with st.form("form_stock_lote"):
-            cm1, cm2, cm3 = st.columns(3)
-            i_camp = st.session_state.campañas.index(item["campaña"]) if item and item["campaña"] in st.session_state.campañas else 0
-            i_esp = st.session_state.especies.index(item["especie"]) if item and item["especie"] in st.session_state.especies else 0
-            
-            sel_camp = cm1.selectbox("Campaña", st.session_state.campañas, index=i_camp)
-            sel_esp = cm2.selectbox("Especie", st.session_state.especies, index=i_esp)
-            
-            list_vars = st.session_state.varMap.get(sel_esp, ["Genérica"])
-            i_var = list_vars.index(item["variedad"]) if item and item["variedad"] in list_vars else 0
-            sel_var = cm3.selectbox("Variedad", list_vars, index=i_var)
-            
-            cm4, cm5, cm6 = st.columns(3)
-            sel_tipo = cm4.selectbox("Tipo de Envase", ["bigbag", "bolsa"], index=0 if not item else (0 if item["tipo"] == "bigbag" else 1))
-            sel_trat = cm5.checkbox("Tratada / Curada", value=False if not item else item["tratada"])
-            sel_cant = cm6.number_input("Cantidad (Uds)", min_value=0, value=0 if not item else item["cantidad"])
-            
-            cm7, cm8, cm9 = st.columns(3)
-            p_def = 800 if sel_tipo == "bigbag" else 25
-            sel_peso = cm7.number_input("Peso Unitario (kg)", min_value=1, value=p_def if not item else item["pesoUnit"])
-            sel_lote = cm8.text_input("Lote Alfanumérico", value="" if not item else item["lote"])
-            sel_ubic = cm9.text_input("Ubicación en Depósito", value="" if not item else item["ubicacion"])
-            
-            cm10, cm11, cm12 = st.columns(3)
-            sel_pg = cm10.number_input("PG % (Poder Germinativo)", min_value=0, max_value=100, value=95 if not item else (item["pg"] if item["pg"] != "" else 0))
-            sel_pmil = cm11.number_input("PMIL (g)", min_value=0, value=150 if not item else (item["pmil"] if item["pmil"] != "" else 0))
-            sel_obs = cm12.text_input("Observaciones generales", value="" if not item else item["obs"])
-            
-            f1, f2 = st.columns(2)
-            if f1.form_submit_button("Confirmar y Guardar en GSheets", type="primary"):
-                if m_type == "new":
-                    n_id = next_id(st.session_state.stock)
-                    nuevo = {
-                        "id": n_id, "campaña": sel_camp, "especie": sel_esp, "variedad": sel_var,
-                        "tipo": sel_tipo, "tratada": sel_trat, "cantidad": sel_cant, "pesoUnit": sel_peso,
-                        "lote": sel_lote, "ubicacion": sel_ubic, "fecha": str(date.today()),
-                        "pg": sel_pg, "pmil": sel_pmil, "obs": sel_obs
-                    }
-                    st.session_state.stock.append(nuevo)
-                    st.session_state.historial.append({
-                        "fecha": now_str(), "campaña": sel_camp, "especie": sel_esp, "variedad": sel_var,
-                        "tipo": sel_tipo, "lote": sel_lote, "remito": "Alta Inicial", "nPedido": "—",
-                        "op": "ingreso", "delta": sel_cant, "kgMovidos": sel_cant * sel_peso,
-                        "stockPrev": 0, "stockPost": sel_cant, "motivo": "Ingreso manual al sistema"
-                    })
-                else:
-                    for idx, i in enumerate(st.session_state.stock):
-                        if i["id"] == item["id"]:
-                            p_cant = i["cantidad"]
-                            st.session_state.stock[idx] = {
-                                "id": item["id"], "campaña": sel_camp, "especie": sel_esp, "variedad": sel_var,
-                                "tipo": sel_tipo, "tratada": sel_trat, "cantidad": sel_cant, "pesoUnit": sel_peso,
-                                "lote": sel_lote, "ubicacion": sel_ubic, "fecha": i["fecha"],
-                                "pg": sel_pg, "pmil": sel_pmil, "obs": sel_obs
-                            }
-                            if p_cant != sel_cant:
-                                o_type = "ingreso" if sel_cant > p_cant else "egreso"
-                                d_units = abs(sel_cant - p_cant)
-                                st.session_state.historial.append({
-                                    "fecha": now_str(), "campaña": sel_camp, "especie": sel_esp, "variedad": sel_var,
-                                    "tipo": sel_tipo, "lote": sel_lote, "remito": "Ajuste Inventario", "nPedido": "—",
-                                    "op": o_type, "delta": d_units, "kgMovidos": d_units * sel_peso,
-                                    "stockPrev": p_cant, "stockPost": sel_cant, "motivo": "Corrección manual de existencias"
-                                })
-                            break
-                save_data()
-                st.session_state.modal = None
-                st.rerun()
-            if f2.form_submit_button("Cancelar"):
-                st.session_state.modal = None
-                st.rerun()
-
-    # MODAL: ELIMINAR REGISTRO DE STOCK
-    elif m_type == "delete":
-        st.error(f"⚠️ ¿Confirmás la eliminación del lote '{item['variedad']}' (Lote: {item['lote']}) del stock?")
-        col_d1, col_d2 = st.columns(2)
-        if col_d1.button("Sí, Eliminar de la base de datos", type="primary", use_container_width=True):
-            st.session_state.stock = [x for x in st.session_state.stock if x["id"] != item["id"]]
-            save_data()
-            st.session_state.modal = None
-            st.rerun()
-        if col_d2.button("Cancelar", use_container_width=True):
-            st.session_state.modal = None
-            st.rerun()
-
-    # MODAL: MOVER / CREAR ORDEN DE CARGA
-    elif m_type == "move":
-        st.subheader(f"⇄ Transacción Logística: {item['variedad']} (Lote: {item['lote']})")
-        op_sel = st.radio("Acción a realizar:", ["Ajuste Logístico Directo (Remito Inmediato)", "Reservar Mercadería (Crear Orden de Carga - OC)"])
+    if m == "new":
+        st.markdown("<div class='section-title'>＋ Nuevo Registro de Stock</div>", unsafe_allow_html=True)
+        c1, c2, c3 = st.columns(3)
+        camp_in = c1.selectbox("Campaña *", st.session_state.campañas)
+        esp_in = c2.selectbox("Especie *", st.session_state.especies)
+        vars_disponibles = st.session_state.varMap.get(esp_in, [])
+        var_in = c3.selectbox("Variedad *", vars_disponibles if vars_disponibles else ["—"])
         
-        with st.form("form_transaccion"):
-            if op_sel == "Ajuste Logístico Directo (Remito Inmediato)":
-                mo_op = st.selectbox("Sentido", ["egreso", "ingreso"], format_func=lambda x: "⬇ Salida / Despacho" if x == "egreso" else "⬆ Entrada / Producción")
-                mo_cant = st.number_input("Unidades a mover", min_value=1, max_value=item['cantidad'] if mo_op == "egreso" else 99999, value=1)
-                mo_rem = st.text_input("N° Remito Oficial")
-                mo_ped = st.text_input("N° Orden de Compra / Pedido")
-                mo_mot = st.text_input("Destinatario / Motivo", value="Despacho directo" if mo_op == "egreso" else "Ingreso de Planta")
-                
-                if st.form_submit_button("Procesar Movimiento Físico"):
-                    for idx, i in enumerate(st.session_state.stock):
-                        if i["id"] == item["id"]:
-                            old_c = i["cantidad"]
-                            new_c = old_c + mo_cant if mo_op == "ingreso" else old_c - mo_cant
-                            st.session_state.stock[idx]["cantidad"] = new_c
-                            st.session_state.historial.append({
-                                "fecha": now_str(), "campaña": i["campaña"], "especie": i["especie"], "variedad": i["variedad"],
-                                "tipo": i["tipo"], "lote": i["lote"], "remito": mo_rem, "nPedido": mo_ped,
-                                "op": mo_op, "delta": mo_cant, "kgMovidos": mo_cant * i["pesoUnit"],
-                                "stockPrev": old_c, "stockPost": new_c, "motivo": mo_mot
-                            })
-                            break
-                    save_data()
-                    st.session_state.modal = None
-                    st.rerun()
+        c4, c5, c6, c7 = st.columns(4)
+        tipo_in = c4.selectbox("Tipo *", ["bigbag", "bolsa"])
+        trat_in = c5.checkbox("¿Tratada?", value=False)
+        cant_in = c6.number_input("Cantidad (Uds) *", min_value=0, value=0)
+        peso_def = 800 if tipo_in == "bigbag" else 25
+        peso_in = c7.number_input("Peso Unitario (kg) *", min_value=1, value=peso_def)
+        
+        c8, c9, c10 = st.columns(3)
+        lote_in = c8.text_input("Lote *", placeholder="Ej. L-104")
+        ubic_in = c9.text_input("Ubicación", placeholder="Ej. Celda A")
+        f_in = c10.date_input("Fecha Ingreso", value=date.today())
+        
+        c11, c12 = st.columns(2)
+        pg_in = c11.number_input("Poder Germinativo (%)", min_value=0, max_value=100, value=95)
+        pmil_in = c12.number_input("Peso de Mil Granos (g)", min_value=0, value=150)
+        obs_in = st.text_area("Observaciones")
+        
+        b1, b2 = st.columns(2)
+        if b1.button("Guardar Registro", type="primary", use_container_width=True):
+            if var_in == "—" or not lote_in.strip():
+                st.error("Por favor completá los campos obligatorios (*).")
             else:
-                oc_cant = st.number_input("Cantidad Comprometida (Uds)", min_value=1, max_value=item['cantidad'], value=1)
-                oc_dest = st.text_input("Destinatario / Productor / Cliente")
-                oc_ped = st.text_input("Referencia de Pedido")
-                oc_rem = st.text_input("Remito Provisorio / Turno")
-                oc_obs = st.text_input("Indicaciones de Chofer / Camión")
-                
-                if st.form_submit_button("Generar Orden de Carga (Pendiente)"):
-                    n_num = next_oc_num(st.session_state.ordenes)
-                    nueva_oc = {
-                        "id": next_id(st.session_state.ordenes), "numero": fmt_oc(n_num), "remito": oc_rem, "nPedido": oc_ped,
-                        "fecha": now_str(), "campaña": item["campaña"], "especie": item["especie"], "variedad": item["variedad"],
-                        "tipo": item["tipo"], "tratada": item["tratada"], "pesoUnit": item["pesoUnit"], "pg": item.get("pg", ""), "pmil": item.get("pmil", ""),
-                        "destino": oc_dest, "obs": oc_obs, "estado": "pendiente", "fechaDespachada": "",
-                        "lotes": [{"lote": item["lote"], "cantidad": oc_cant, "ubicacion": item.get("ubicacion", "")}]
-                    }
-                    st.session_state.ordenes.append(nueva_oc)
-                    save_data()
-                    st.session_state.modal = None
-                    st.rerun()
-            if st.form_submit_button("Volver"):
-                st.session_state.modal = None
-                st.rerun()
+                new_item = {
+                    "id": next_id(st.session_state.stock), "campaña": camp_in, "especie": esp_in,
+                    "variedad": var_in, "tipo": tipo_in, "tratada": trat_in, "cantidad": int(cant_in),
+                    "pesoUnit": int(peso_in), "lote": lote_in.strip(), "ubicacion": ubic_in.strip(),
+                    "fecha": str(f_in), "pg": int(pg_in), "pmil": int(pmil_in), "obs": obs_in.strip()
+                }
+                st.session_state.stock.append(new_item)
+                save_data(); st.session_state.modal = None; st.rerun()
+        if b2.button("Cancelar", use_container_width=True):
+            st.session_state.modal = None; st.rerun()
 
-    # MODAL: EDITAR ORDEN DE CARGA
-    elif m_type == "editOC":
-        st.subheader(f"✏ Modificar Datos de {oc['numero']}")
-        with st.form("form_edit_oc_fields"):
-            eo_dest = st.text_input("Destino", value=oc["destino"])
-            eo_rem = st.text_input("Remito", value=oc["remito"])
-            eo_ped = st.text_input("N° Pedido", value=oc["nPedido"])
-            eo_obs = st.text_input("Observaciones", value=oc["obs"])
-            
-            b_o1, b_o2 = st.columns(2)
-            if b_o1.form_submit_button("Actualizar OC"):
-                for idx, o in enumerate(st.session_state.ordenes):
-                    if o["id"] == oc["id"]:
-                        st.session_state.ordenes[idx]["destino"] = eo_dest
-                        st.session_state.ordenes[idx]["remito"] = eo_rem
-                        st.session_state.ordenes[idx]["nPedido"] = eo_ped
-                        st.session_state.ordenes[idx]["obs"] = eo_obs
-                        break
-                save_data()
-                st.session_state.modal = None
-                st.rerun()
-            if b_o2.form_submit_button("Cancelar"):
-                st.session_state.modal = None
-                st.rerun()
-
-    # MODAL: DESPACHAR ORDEN DE CARGA (PROCESO COMPLETO)
-    elif m_type == "despachar":
-        st.warning(f"🚚 ¿Confirmás la salida de camión y despacho definitivo de la {oc['numero']}?")
-        st.write(f"Variedad: **{oc['variedad']}** ➔ Destino: **{oc['destino']}**")
+    elif m == "edit" and st.session_state.edit_item:
+        item = st.session_state.edit_item
+        st.markdown(f"<div class='section-title'>✏️ Editar Registro (ID: {item['id']})</div>", unsafe_allow_html=True)
+        c1, c2, c3 = st.columns(3)
+        camp_in = c1.selectbox("Campaña", st.session_state.campañas, index=st.session_state.campañas.index(item["campaña"]) if item["campaña"] in st.session_state.campañas else 0)
+        esp_in = c2.selectbox("Especie", st.session_state.especies, index=st.session_state.especies.index(item["especie"]) if item["especie"] in st.session_state.especies else 0)
+        vars_disponibles = st.session_state.varMap.get(esp_in, [])
+        var_idx = vars_disponibles.index(item["variedad"]) if item["variedad"] in vars_disponibles else 0
+        var_in = c3.selectbox("Variedad", vars_disponibles if vars_disponibles else ["—"], index=var_idx)
         
-        col_dp1, col_dp2 = st.columns(2)
-        if col_dp1.button("Confirmar Salida Física (Descontar Stock)", type="primary", use_container_width=True):
-            error_operacion = False
-            for chunk in oc.get("lotes", []):
-                l_target = chunk["lote"]
-                l_req = chunk["cantidad"]
-                
-                stk_item = next((x for x in st.session_state.stock if x["variedad"] == oc["variedad"] and x["lote"] == l_target and x["tipo"] == oc["tipo"]), None)
-                if stk_item and stk_item["cantidad"] >= l_req:
-                    for idx, s in enumerate(st.session_state.stock):
-                        if s["id"] == stk_item["id"]:
-                            pre_c = s["cantidad"]
-                            st.session_state.stock[idx]["cantidad"] = pre_c - l_req
-                            st.session_state.historial.append({
-                                "fecha": now_str(), "campaña": oc["campaña"], "especie": oc["especie"], "variedad": oc["variedad"],
-                                "tipo": oc["tipo"], "lote": l_target, "remito": oc["remito"] if oc["remito"] else "RE-OC", "nPedido": oc["nPedido"],
-                                "op": "egreso", "delta": l_req, "kgMovidos": l_req * oc["pesoUnit"],
-                                "stockPrev": pre_c, "stockPost": pre_c - l_req, "motivo": f"Despacho {oc['numero']} ➔ Cliente: {oc['destino']}"
-                            })
-                            break
-                else:
-                    error_operacion = True
-                    st.error(f"Stock insuficiente en el lote {l_target} para cumplir con el despacho solicitado.")
+        c4, c5, c6, c7 = st.columns(4)
+        tipo_in = c4.selectbox("Tipo", ["bigbag", "bolsa"], index=0 if item["tipo"]=="bigbag" else 1)
+        trat_in = c5.checkbox("¿Tratada?", value=item["tratada"])
+        cant_in = c6.number_input("Cantidad (Uds)", min_value=0, value=int(item["cantidad"]))
+        peso_in = c7.number_input("Peso Unitario (kg)", min_value=1, value=int(item["pesoUnit"]))
+        
+        c8, c9, c10 = st.columns(3)
+        lote_in = c8.text_input("Lote", value=item["lote"])
+        ubic_in = c9.text_input("Ubicación", value=item["ubicacion"])
+        try:
+            val_f = datetime.strptime(item["fecha"], "%Y-%m-%d").date()
+        except:
+            val_f = date.today()
+        f_in = c10.date_input("Fecha", value=val_f)
+        
+        c11, c12 = st.columns(2)
+        pg_in = c11.number_input("PG (%)", min_value=0, max_value=100, value=int(item.get("pg", 95)))
+        pmil_in = c12.number_input("PMIL (g)", min_value=0, value=int(item.get("pmil", 150)))
+        obs_in = st.text_area("Observaciones", value=item["obs"])
+        
+        b1, b2 = st.columns(2)
+        if b1.button("Actualizar Registro", type="primary", use_container_width=True):
+            item.update({
+                "campaña": camp_in, "especie": esp_in, "variedad": var_in, "tipo": tipo_in,
+                "tratada": trat_in, "cantidad": int(cant_in), "pesoUnit": int(peso_in),
+                "lote": lote_in, "ubicacion": ubic_in, "fecha": str(f_in), "pg": int(pg_in),
+                "pmil": int(pmil_in), "obs": obs_in
+            })
+            save_data(); st.session_state.modal = None; st.rerun()
+        if b2.button("Cancelar", use_container_width=True):
+            st.session_state.modal = None; st.rerun()
+
+    elif m == "delete" and st.session_state.edit_item:
+        item = st.session_state.edit_item
+        st.warning(f"⚠️ ¿Seguro que querés eliminar el lote **{item['lote']}** de **{item['variedad']}** ({item['campaña']})?")
+        b1, b2 = st.columns(2)
+        if b1.button("Sí, eliminar", type="primary", use_container_width=True):
+            st.session_state.stock = [x for x in st.session_state.stock if x["id"] != item["id"]]
+            save_data(); st.session_state.modal = None; st.rerun()
+        if b2.button("Cancelar", use_container_width=True):
+            st.session_state.modal = None; st.rerun()
+
+    elif m == "move" and st.session_state.edit_item:
+        item = st.session_state.edit_item
+        st.markdown(f"<div class='section-title'>⇄ Gestión de Movimientos: {item['variedad']} (Lote: {item['lote']})</div>", unsafe_allow_html=True)
+        acc_type = st.radio("Acción a realizar:", ["Ingreso Directo (Ajuste)", "Egreso Directo (Consumo/Baja)", "Generar Orden de Carga (Reserva)"])
+        
+        if acc_type in ["Ingreso Directo (Ajuste)", "Egreso Directo (Consumo/Baja)"]:
+            c1, c2 = st.columns(2)
+            qty_mov = c1.number_input("Cantidad de bultos (unidades)", min_value=1, value=1)
+            rem_mov = c2.text_input("N° Remito Asociado")
+            c3, c4 = st.columns(2)
+            ped_mov = c3.text_input("N° Pedido Interno")
+            mot_mov = c4.text_input("Motivo / Destino Interno")
             
-            if not error_operacion:
-                for idx, o in enumerate(st.session_state.ordenes):
-                    if o["id"] == oc["id"]:
-                        st.session_state.ordenes[idx]["estado"] = "despachada"
-                        st.session_state.ordenes[idx]["fechaDespachada"] = now_str()
-                        break
+            b1, b2 = st.columns(2)
+            if b1.button("Confirmar Movimiento", type="primary", use_container_width=True):
+                op = "ingreso" if "Ingreso" in acc_type else "egreso"
+                old_qty = item["cantidad"]
+                if op == "egreso" and qty_mov > old_qty:
+                    st.error("Error: No podés egresar más de lo disponible en stock físico.")
+                else:
+                    item["cantidad"] = old_qty + qty_mov if op == "ingreso" else old_qty - qty_mov
+                    st.session_state.historial.append({
+                        "fecha": now_str(), "campaña": item["campaña"], "especie": item["especie"],
+                        "variedad": item["variedad"], "tipo": item["tipo"], "lote": item["lote"],
+                        "remito": rem_mov, "nPedido": ped_mov, "op": op, "delta": int(qty_mov),
+                        "kgMovidos": int(qty_mov * item["pesoUnit"]), "stockPrev": old_qty,
+                        "stockPost": item["cantidad"], "motivo": mot_mov
+                    })
+                    save_data(); st.session_state.modal = None; st.rerun()
+            if b2.button("Cancelar", use_container_width=True):
+                st.session_state.modal = None; st.rerun()
+        else:
+            c1, c2 = st.columns(2)
+            qty_oc = c1.number_input("Cantidad para la Orden de Carga", min_value=1, max_value=int(item["cantidad"]), value=1)
+            dest_oc = c2.text_input("Destino / Cliente Responsable")
+            c3, c4 = st.columns(2)
+            rem_oc = c3.text_input("Remito Previsto")
+            ped_oc = c4.text_input("Pedido Vinculado")
+            obs_oc = st.text_area("Observaciones de la Carga")
+            
+            b1, b2 = st.columns(2)
+            if b1.button("Crear Orden de Carga Pendiente", type="primary", use_container_width=True):
+                if not dest_oc.strip():
+                    st.error("Debes ingresar un destino/cliente.")
+                else:
+                    oc_num = next_oc_num(st.session_state.ordenes)
+                    st.session_state.ordenes.append({
+                        "id": next_id(st.session_state.ordenes), "numero": fmt_oc(oc_num),
+                        "remito": rem_oc, "nPedido": ped_oc, "fecha": now_str(),
+                        "campaña": item["campaña"], "especie": item["especie"], "variedad": item["variedad"],
+                        "tipo": item["tipo"], "pesoUnit": item["pesoUnit"], "pg": item.get("pg"), "pmil": item.get("pmil"),
+                        "lotes": [{"lote": item["lote"], "ubicacion": item["ubicacion"], "cantidad": int(qty_oc), "stock_id": item["id"]}],
+                        "destino": dest_oc, "obs": obs_oc, "estado": "pendiente", "fechaDespachada": ""
+                    })
+                    save_data(); st.session_state.modal = None; st.rerun()
+            if b2.button("Cancelar", use_container_width=True):
+                st.session_state.modal = None; st.rerun()
+
+    elif m == "despachar" and st.session_state.edit_oc:
+        oc = st.session_state.edit_oc
+        st.markdown(f"<div class='section-title'>✓ Confirmar Despacho Físico: {oc['numero']}</div>", unsafe_allow_html=True)
+        st.info(f"Se procesará el despacho de **{oc['variedad']}** con destino a **{oc['destino']}**.")
+        
+        b1, b2 = st.columns(2)
+        if b1.button("Confirmar y Restar de Stock", type="primary", use_container_width=True):
+            puede_despachar = True
+            for l in oc.get("lotes", []):
+                s_item = next((x for x in st.session_state.stock if x["id"] == l["stock_id"]), None)
+                if not s_item or s_item["cantidad"] < l["cantidad"]:
+                    puede_despachar = False
+            
+            if not puede_despachar:
+                st.error("No se puede despachar: Stock físico insuficiente en los lotes asignados.")
+            else:
+                for l in oc.get("lotes", []):
+                    s_item = next((x for x in st.session_state.stock if x["id"] == l["stock_id"]), None)
+                    old_q = s_item["cantidad"]
+                    s_item["cantidad"] -= l["cantidad"]
+                    st.session_state.historial.append({
+                        "fecha": now_str(), "campaña": oc["campaña"], "especie": oc["especie"],
+                        "variedad": oc["variedad"], "tipo": oc["tipo"], "lote": l["lote"],
+                        "remito": oc["remito"], "nPedido": oc["nPedido"], "op": "egreso",
+                        "delta": l["cantidad"], "kgMovidos": l["cantidad"] * oc["pesoUnit"],
+                        "stockPrev": old_q, "stockPost": s_item["cantidad"],
+                        "motivo": f"Despacho {oc['numero']} -> {oc['destino']}"
+                    })
+                oc["estado"] = "despachada"
+                oc["fechaDespachada"] = now_str()
                 save_data()
+                st.session_state.wa_pending = oc
                 st.session_state.modal = None
                 st.rerun()
-        if col_dp2.button("Cancelar", use_container_width=True):
-            st.session_state.modal = None
-            st.rerun()
+        if b2.button("Cancelar", use_container_width=True):
+            st.session_state.modal = None; st.rerun()
 
-    # MODAL: ELIMINAR ORDEN DE CARGA
-    elif m_type == "deleteOC":
-        st.error(f"🗑️ ¿Deseas anular y eliminar definitivamente la Orden de Carga {oc['numero']}?")
-        col_oc1, col_oc2 = st.columns(2)
-        if col_oc1.button("Sí, Anular", type="primary", use_container_width=True):
+    elif m == "deleteOC" and st.session_state.edit_oc:
+        oc = st.session_state.edit_oc
+        st.warning(f"⚠️ ¿Seguro que querés eliminar permanentemente la orden **{oc['numero']}**?")
+        b1, b2 = st.columns(2)
+        if b1.button("Sí, eliminar orden", type="primary", use_container_width=True):
             st.session_state.ordenes = [x for x in st.session_state.ordenes if x["id"] != oc["id"]]
-            save_data()
-            st.session_state.modal = None
-            st.rerun()
-        if col_oc2.button("Cancelar", use_container_width=True):
-            st.session_state.modal = None
-            st.rerun()
+            save_data(); st.session_state.modal = None; st.rerun()
+        if b2.button("Cancelar", use_container_width=True):
+            st.session_state.modal = None; st.rerun()
 
-# ─── PIE DE PÁGINA PROFESIONAL ─────────────────────────────────
+# ══════════════════════════════════════════════════════════════
+# VENTANA DE NOTIFICACIÓN WHATSAPP EMITIDA
+# ══════════════════════════════════════════════════════════════
+if "wa_pending" in st.session_state and st.session_state.wa_pending:
+    wa_oc = st.session_state.wa_pending
+    st.markdown("---")
+    st.success(f"🎉 ¡Orden de Carga {wa_oc['numero']} despachada físicamente con éxito!")
+    
+    tot_cant_oc = sum(l.get("cantidad", 0) for l in wa_oc.get("lotes", []))
+    w_msg = (
+        f"🌱 *La Clementina · Planta de Semillas*\n"
+        f"📦 *Orden de Carga Despachada: {wa_oc['numero']}*\n\n"
+        f"🔹 *Especie:* {wa_oc['especie']}\n"
+        f"🔹 *Variedad:* {wa_oc['variedad']}\n"
+        f"🔹 *Tipo:* {wa_oc['tipo'].upper()}\n"
+        f"🔹 *Cantidad:* {tot_cant_oc} bultos\n"
+        f"⚖️ *Peso Neto:* {fmt(tot_cant_oc * wa_oc['pesoUnit'])} kg\n"
+        f"📍 *Destino:* {wa_oc.get('destino','—')}\n"
+        f"📄 *Remito:* {wa_oc.get('remito','—')} | *Pedido:* {wa_oc.get('nPedido','—')}\n"
+        f"📅 *Despacho:* {wa_oc['fechaDespachada']}\n\n"
+        f"¡Buen viaje! 🚛"
+    )
+    import urllib.parse
+    wa_url = f"https://wa.me/?text={urllib.parse.quote(w_msg)}"
+    
+    st.link_button("📲 Enviar Comprobante por WhatsApp", wa_url, type="primary", use_container_width=True)
+    if st.button("Cerrar panel de notificación", use_container_width=True):
+        st.session_state.wa_pending = None
+        st.rerun()
+
+# ─── PIE DE PÁGINA ────────────────────────────────────────────
 st.markdown("---")
-st.markdown("<p style='text-align: center; font-size: 0.8rem; color: #6b7280; letter-spacing: 0.5px;'>Sistema desarrollado por Ignacio Diaz</p>", unsafe_allow_html=True)
+st.markdown(
+    "<div style='text-align: center; color: #6b7280; font-size: 0.8rem; padding: 10px 0 20px;'>"
+    "La Clementina · Sistema de Gestión de Stock · Creado por Ignacio Diaz"
+    "</div>", 
+    unsafe_allow_html=True
+)
